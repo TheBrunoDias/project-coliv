@@ -38,6 +38,7 @@ export interface Group {
   createdAt: Timestamp;
 }
 
+// 'biweekly' is legacy (read as weekly with interval 2); new tasks use interval instead
 export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 
 export interface Task {
@@ -47,6 +48,7 @@ export interface Task {
   assigneeType: 'user' | 'group';
   rotation: string[]; // Ordered userIds or groupIds; a single id = fixed assignee
   frequency: Frequency;
+  interval?: number; // Turn length in `frequency` units (default 1): weekly + 2 = every 2 weeks
   anchorDate: Timestamp; // Start of the period in which rotation[anchorIndex] is responsible
   anchorIndex: number;
   createdBy: string;

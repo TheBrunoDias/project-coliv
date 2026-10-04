@@ -186,14 +186,56 @@ service cloud.firestore {
         allow delete: if isAdmin(houseId);
       }
 
-      // ---------- Phase 3-5 collections ----------
-      // Create/update rules come with their phase; read + admin delete are needed now
-      // so the admin can delete the whole house.
+      // ---------- Tasks ----------
 
       match /tasks/{taskId} {
+        function isValidTask(task) {
+          return task.keys().hasAll(['id', 'title', 'assigneeType', 'rotation', 'frequency', 'anchorDate', 'anchorIndex', 'createdBy', 'createdAt', 'updatedAt'])
+            && task.keys().hasOnly(['id', 'title', 'description', 'assigneeType', 'rotation', 'frequency', 'interval', 'anchorDate', 'anchorIndex', 'createdBy', 'createdAt', 'updatedAt'])
+            && task.id == taskId
+            && task.title is string && task.title.trim().size() > 0 && task.title.size() <= 80
+            && (!('description' in task) || (task.description is string && task.description.size() <= 500))
+            && task.assigneeType in ['user', 'group']
+            && isValidRotation(task);
+        }
+
+        function isValidRotation(task) {
+          return task.rotation is list && task.rotation.size() <= 30
+            && task.frequency in ['daily', 'weekly', 'biweekly', 'monthly']
+            && (!('interval' in task) || (task.interval is int && task.interval >= 1 && task.interval <= 30))
+            && task.anchorDate is timestamp
+            && task.anchorIndex is int && task.anchorIndex >= 0
+            && (task.rotation.size() == 0 || task.anchorIndex < task.rotation.size());
+        }
+
         allow read: if isMember(houseId);
+
+        allow create: if isAdmin(houseId)
+          && isValidTask(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+
+        // Admin edits anything but authorship. Any member may remove *themselves* from a
+        // user rotation (used when leaving the house), re-anchoring the turn.
+        allow update: if (isAdmin(houseId)
+            && isValidTask(request.resource.data)
+            && !changedKeys().hasAny(['id', 'createdBy', 'createdAt'])
+            && request.resource.data.updatedAt == request.time)
+          || (isMember(houseId)
+            && resource.data.assigneeType == 'user'
+            && request.auth.uid in resource.data.rotation
+            && changedKeys().hasOnly(['rotation', 'anchorDate', 'anchorIndex', 'updatedAt'])
+            && request.resource.data.rotation == resource.data.rotation.removeAll([request.auth.uid])
+            && isValidRotation(request.resource.data)
+            && request.resource.data.updatedAt == request.time);
+
         allow delete: if isAdmin(houseId);
       }
+
+      // ---------- Phase 4-5 collections ----------
+      // Create/update rules come with their phase; read + admin delete are needed now
+      // so the admin can delete the whole house.
 
       match /shopping_items/{itemId} {
         allow read: if isMember(houseId);

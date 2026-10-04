@@ -14,7 +14,7 @@ interface NavItem {
 
 const items: NavItem[] = [
   { href: '/', label: 'Início', icon: House },
-  { href: '/tasks', label: 'Tarefas', icon: Repeat, disabled: true },
+  { href: '/tasks', label: 'Tarefas', icon: Repeat },
   { href: '/shopping', label: 'Compras', icon: ShoppingCart, disabled: true },
   { href: '/notices', label: 'Mural', icon: Megaphone, disabled: true },
   { href: '/house', label: 'Casa', icon: Users },

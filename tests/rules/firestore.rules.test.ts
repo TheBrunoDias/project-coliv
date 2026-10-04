@@ -298,6 +298,90 @@ describe('leaving and removing members', () => {
   });
 });
 
+describe('tasks', () => {
+  const taskRef = (uid: string) => doc(dbAs(uid), 'houses', HOUSE_ID, 'tasks', 't1');
+  const newTask = (createdBy: string) => ({
+    id: 't1',
+    title: 'Tirar o lixo',
+    assigneeType: 'user',
+    rotation: ['admin', 'ana', 'bia'],
+    frequency: 'weekly',
+    anchorDate: new Date(2026, 9, 5),
+    anchorIndex: 0,
+    createdBy,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  async function seedTask() {
+    await seed((db) =>
+      setDoc(doc(db, 'houses', HOUSE_ID, 'tasks', 't1'), {
+        ...newTask('admin'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  }
+
+  it('lets only the admin create tasks', async () => {
+    await seedHouse('admin', ['ana']);
+    await assertFails(setDoc(taskRef('ana'), newTask('ana')));
+    await assertSucceeds(setDoc(taskRef('admin'), newTask('admin')));
+  });
+
+  it('accepts custom intervals', async () => {
+    await seedHouse('admin');
+    await assertSucceeds(setDoc(taskRef('admin'), { ...newTask('admin'), interval: 3 }));
+  });
+
+  it('rejects invalid tasks', async () => {
+    await seedHouse('admin');
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), anchorIndex: 3 }));
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), frequency: 'yearly' }));
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), interval: 0 }));
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), interval: 1.5 }));
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), title: '  ' }));
+    await assertFails(setDoc(taskRef('admin'), { ...newTask('admin'), status: 'done' }));
+  });
+
+  it('lets the admin edit tasks but not residents', async () => {
+    await seedHouse('admin', ['ana']);
+    await seedTask();
+    await assertFails(updateDoc(taskRef('ana'), { title: 'Outro', updatedAt: serverTimestamp() }));
+    await assertSucceeds(
+      updateDoc(taskRef('admin'), { title: 'Outro', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(taskRef('admin'), { createdBy: 'ana', updatedAt: serverTimestamp() }),
+    );
+  });
+
+  it('lets a resident remove only themselves from a rotation when leaving', async () => {
+    await seedHouse('admin', ['ana', 'bia']);
+    await seedTask();
+
+    await assertFails(
+      updateDoc(taskRef('ana'), {
+        rotation: ['admin', 'ana'],
+        anchorIndex: 0,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+
+    const db = dbAs('ana');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'houses', HOUSE_ID, 'tasks', 't1'), {
+      rotation: ['admin', 'bia'],
+      anchorDate: new Date(2026, 9, 12),
+      anchorIndex: 1,
+      updatedAt: serverTimestamp(),
+    });
+    batch.delete(doc(db, 'houses', HOUSE_ID, 'members', 'ana'));
+    batch.update(doc(db, 'users', 'ana'), { houseId: null });
+    await assertSucceeds(batch.commit());
+  });
+});
+
 describe('groups', () => {
   it('lets only the admin create groups and assign members', async () => {
     await seedHouse('admin', ['ana']);

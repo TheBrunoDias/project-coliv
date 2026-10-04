@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   FirestoreError,
   getDoc,
@@ -15,6 +14,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { House, HouseMember, Invite, User } from '@/types';
 import { generateInviteCode, isValidInviteCode } from '@/utils/inviteCode';
+import { removeFromRotations } from './taskService';
 
 // Firestore allows up to 500 writes per batch
 const BATCH_SIZE = 400;
@@ -99,14 +99,18 @@ export async function regenerateInviteCode(house: House): Promise<void> {
 
 export async function leaveHouse(houseId: string, uid: string): Promise<void> {
   const batch = writeBatch(db);
+  await removeFromRotations(batch, houseId, uid, 'user');
   batch.delete(memberRef(houseId, uid));
   batch.update(userRef(uid), { houseId: null });
   await batch.commit();
 }
 
 /** The removed user's own `houseId` is cleared lazily on their device. */
-export function removeMember(houseId: string, memberId: string): Promise<void> {
-  return deleteDoc(memberRef(houseId, memberId));
+export async function removeMember(houseId: string, memberId: string): Promise<void> {
+  const batch = writeBatch(db);
+  await removeFromRotations(batch, houseId, memberId, 'user');
+  batch.delete(memberRef(houseId, memberId));
+  await batch.commit();
 }
 
 async function deleteDocs(refs: DocumentReference[]): Promise<void> {

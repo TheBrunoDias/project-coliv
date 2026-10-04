@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Group, HouseMember } from '@/types';
+import { removeFromRotations } from './taskService';
 
 const groupsRef = (houseId: string) => collection(db, 'houses', houseId, 'groups');
 const memberRef = (houseId: string, uid: string) => doc(db, 'houses', houseId, 'members', uid);
@@ -25,13 +26,14 @@ export function renameGroup(houseId: string, groupId: string, name: string): Pro
   return updateDoc(doc(groupsRef(houseId), groupId), { name });
 }
 
-/** Deletes the group and removes it from every member. */
+/** Deletes the group and removes it from every member and task rotation. */
 export async function deleteGroup(
   houseId: string,
   groupId: string,
   members: HouseMember[],
 ): Promise<void> {
   const batch = writeBatch(db);
+  await removeFromRotations(batch, houseId, groupId, 'group');
   members
     .filter((member) => member.groupIds.includes(groupId))
     .forEach((member) =>

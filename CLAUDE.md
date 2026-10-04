@@ -49,19 +49,24 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
 ### Tasks (Rotating Reminders)
 
 - Tasks are created and edited **only by the admin**.
-- A task has an ordered **rotation** of assignees (users or groups) and a **frequency** (`daily`, `weekly`, `biweekly`, `monthly`).
+- A task is delegated either to **residents** or to **groups** (`assigneeType`): with groups, the whole group is responsible during its turn (e.g. "Kitchen cleaning: Room A, then Room B").
+- A task has an ordered **rotation** of assignees and a **schedule**: `frequency` (`daily`, `weekly`, `monthly`) × `interval` (1–30), e.g. weekly × 2 = every 2 weeks. The form offers presets (every day / week / 2 weeks / month) plus a custom "every N days/weeks/months".
+- Legacy `frequency: 'biweekly'` is read as weekly × 2 (`toRotation` normalizes it); new tasks never write it.
 - A rotation with a single assignee is a **fixed responsibility** (never changes hands).
 - Tasks have **no completion status**. The UI shows the **current** responsible person/group, the **next** one, and **when the turn changes**.
 - The current assignee is **computed on the client** from the task data (no cron job or backend needed):
-  - `currentIndex = (anchorIndex + periodsElapsed(anchorDate, now, frequency)) % rotation.length`
-  - `daily` / `weekly` / `biweekly` periods count 1 / 7 / 14 days; `monthly` counts calendar months.
+  - `currentIndex = (anchorIndex + periodsElapsed(anchorDate, now, frequency, interval)) % rotation.length`
+  - `daily` / `weekly` periods count 1 / 7 days × `interval`; `monthly` counts calendar months × `interval`.
   - Implement this in `src/utils/rotation.ts` as pure functions.
 - When the rotation list changes (task edited, member leaves), **re-anchor** the task so the current turn is preserved: set `anchorDate` to the start of the current period and `anchorIndex` to the current assignee's position in the new list (if the current assignee was removed, the next one in line takes over).
+- **Editing**: the form loads the rotation via `toEditableRotation` — reordered so the current assignee is first, with the start date set to the current period — and saves with `anchorIndex: 0`. Saving unchanged keeps every turn; the admin changes who is on duty by reordering or changing the date.
+- Periods are computed in the **device's local time** (calendar days, DST-safe; months clamp to shorter months: Jan 31 → Feb 28).
+- UI reads tasks through `useTaskViews()` (resolved current/next assignee, refreshed every minute by `useNow`). Unknown user ids render as "Ex-morador", deleted groups as "Grupo removido".
 
 ### Leaving a House
 
 - Leaving removes the member document (group membership lives in `members.groupIds`, so it goes with it) and sets `users.houseId` to `null`, in a single batch.
-- It must also remove the user from all user-type task rotations (re-anchoring those tasks). **TODO Phase 3:** tasks are admin-write only, so add a rule that lets a member update a task only to remove their own id from `rotation` (+ anchor fields), and do it in the leave batch.
+- In the same batch, the user is removed from every user-type task rotation (`removeFromRotations`, re-anchored). Tasks are admin-write only, but the rules let any member update a task **only** to remove their own id from `rotation` (+ anchor fields). Removing a member (admin) and deleting a group clean rotations the same way.
 - The admin can remove residents from the house (same cleanup as leaving). The removed user's `houseId` is cleared lazily on their device (see below).
 - **The admin cannot simply leave: leaving means deleting the house.** The UI must warn clearly and ask for confirmation (e.g., type the house name).
 
@@ -207,7 +212,7 @@ interface Group {
 Document ID: `{taskId}`
 
 ```typescript
-type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly'; // 'biweekly' is legacy
 
 interface Task {
   id: string;
@@ -216,6 +221,7 @@ interface Task {
   assigneeType: 'user' | 'group';
   rotation: string[]; // Ordered userIds or groupIds; a single id = fixed assignee
   frequency: Frequency;
+  interval?: number; // 1–30, default 1: weekly + 2 = every 2 weeks
   anchorDate: Timestamp; // Start of the period in which rotation[anchorIndex] is responsible
   anchorIndex: number;
   createdBy: string; // userId of the admin
@@ -322,11 +328,11 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 - `tasks`, `groups`, `notice_board`, house settings, house deletion: write only by the admin (`houses.ownerId == request.auth.uid`).
 - `members/{uid}`: a resident may delete their own document (leave); the admin may delete any resident's document (remove) and all documents when deleting the house.
 - `shopping_items`: write by any member.
-- Collections from later phases (`tasks`, `shopping_items`, `notice_board`) currently only allow member read + admin delete (needed for house deletion). Add create/update rules with each phase.
+- Collections from later phases (`shopping_items`, `notice_board`) currently only allow member read + admin delete (needed for house deletion). Add create/update rules with each phase.
 
 ### Testing
 
-- `pnpm test` — unit tests (Vitest) for `src/**/*.test.ts` (pure utils).
+- `pnpm test` — unit tests (Vitest) for `src/**/*.test.ts` (pure utils). Rotation tests should pass in any `TZ` (e.g. `TZ=America/New_York pnpm test`).
 - `pnpm test:rules` — security rules tests in `tests/rules/` against the Firestore emulator (demo project, never touches production). Requires **Java 21+** (`sudo update-alternatives --config java`, or set `JAVA_HOME`).
 - **Every rules change must come with tests.** Mirror the exact batch shapes used in `src/services/`.
 - Deploy rules after changing them: `firebase deploy --only firestore:rules`.
@@ -358,11 +364,11 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 
 ### Phase 3: Task Rotations
 
-- [ ] Rotation utilities (`src/utils/rotation.ts`): current assignee, next assignee, next change date, re-anchoring.
-- [ ] Rules for `tasks` create/update (admin) + the "remove myself from rotations" exception used when leaving; update `leaveHouse` / `removeMember` / `deleteGroup` to clean rotations.
-- [ ] Task form (admin only): title, description, assignee type, ordered rotation, frequency, start date.
-- [ ] Task list showing current and next assignee and when the turn changes.
-- [ ] Dashboard highlight: "Your responsibilities right now".
+- [x] Rotation utilities (`src/utils/rotation.ts`): current assignee, next assignee, next change date, re-anchoring.
+- [x] Rules for `tasks` create/update (admin) + the "remove myself from rotations" exception used when leaving; update `leaveHouse` / `removeMember` / `deleteGroup` to clean rotations.
+- [x] Task form (admin only): title, description, assignee type, ordered rotation, frequency, start date.
+- [x] Task list showing current and next assignee and when the turn changes.
+- [x] Dashboard highlight: "Your responsibilities right now".
 
 ### Phase 4: Shared Shopping List
 
