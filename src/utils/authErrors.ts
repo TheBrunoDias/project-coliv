@@ -9,6 +9,9 @@ const messages: Record<string, string> = {
   'auth/too-many-requests': 'Muitas tentativas. Aguarde um pouco e tente novamente.',
   'auth/network-request-failed': 'Sem conexão. Verifique sua internet.',
   'auth/popup-blocked': 'O navegador bloqueou a janela de login. Permita pop-ups e tente novamente.',
+  'auth/user-mismatch': 'Entre com a mesma conta que você está usando agora.',
+  'auth/requires-recent-login': 'Por segurança, entre novamente e tente outra vez.',
+  'auth/missing-password': 'Digite sua senha.',
   'auth/account-exists-with-different-credential':
     'Este e-mail já está cadastrado com outro método de login.',
 };

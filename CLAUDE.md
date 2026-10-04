@@ -44,6 +44,7 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
   - Not logged in → login/register, then return to the invite page.
   - Already in another house → show a message explaining they must leave their current house first.
   - No house → show the house name and a "Join" button.
+- How it is enforced: `invites/{code}` stores `houseId` + `houseName` (so non-members can see the name). Joining writes the member document **with the `inviteCode` used**, and the rules check it against `houses.inviteCode`.
 
 ### Tasks (Rotating Reminders)
 
@@ -59,8 +60,9 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
 
 ### Leaving a House
 
-- Leaving removes the member document, removes the user from all groups and from all user-type task rotations (re-anchoring those tasks), and sets `users.houseId` to `null`. Do this in a single batched write/transaction.
-- The admin can remove residents from the house (same cleanup as leaving).
+- Leaving removes the member document (group membership lives in `members.groupIds`, so it goes with it) and sets `users.houseId` to `null`, in a single batch.
+- It must also remove the user from all user-type task rotations (re-anchoring those tasks). **TODO Phase 3:** tasks are admin-write only, so add a rule that lets a member update a task only to remove their own id from `rotation` (+ anchor fields), and do it in the leave batch.
+- The admin can remove residents from the house (same cleanup as leaving). The removed user's `houseId` is cleared lazily on their device (see below).
 - **The admin cannot simply leave: leaving means deleting the house.** The UI must warn clearly and ask for confirmation (e.g., type the house name).
 
 ### Deleting a House
@@ -68,7 +70,18 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
 - Only the admin can delete the house.
 - Deletion removes the house document, all its subcollections (`members`, `groups`, `tasks`, `shopping_items`, `notice_board`) and its `invites` document, using batched writes (max 500 operations per batch).
 - The admin's own `users.houseId` is set to `null` in the same operation.
-- Other residents' `users.houseId` cannot be written by the admin (security rules), so it is **cleared lazily**: on app load, if `users.houseId` points to a house that no longer exists (or the user has no member document there), the client sets its own `houseId` to `null` and redirects to `/onboarding`.
+- Other residents' `users.houseId` cannot be written by the admin (security rules), so it is **cleared lazily** by `useHouseListeners`: when a listener gets `permission-denied`, the house is missing, or the user is not in `members`, it waits for pending writes and asks the server (`isConfirmedMember`) before clearing `houseId` — listeners can run ahead of a just-committed create/join batch.
+
+### Deleting an Account
+
+- Available on the House page ("Sua conta") and on onboarding.
+- Flow (`DeleteAccountDialog` → `accountService.deleteAccount`):
+  1. Type `EXCLUIR` and **reauthenticate** (Google popup or password) — Firebase requires a recent sign-in to delete the auth user, so this happens before any data is touched.
+  2. Admin → the house is deleted (same as "Deleting a House"); resident → leaves the house.
+  3. Delete `users/{uid}` (rules only allow it once `houseId` is `null`).
+  4. Delete the Firebase Auth user, which signs them out.
+- While it runs, `useAuthStore.deletingAccount` keeps the UI on a loader so the profile listener does not redirect or show errors midway.
+- Content the user created in other places (e.g. shopping items `createdBy`) stays; the UI must handle unknown user ids gracefully (e.g. "Ex-morador").
 
 ### Notice Board
 
@@ -252,6 +265,11 @@ interface Notice {
 - Use Client Components (`'use client'`) for interactive components, forms, and pages using Zustand stores or Firestore real-time listeners (`onSnapshot`).
 - Keep layout shell structure lean to optimize PWA load times.
 
+### React Compiler
+
+- `reactCompiler: true` is on. The compiler reads the property paths used inside closures **during render** to memoize them.
+- Never use non-null assertions on nullable state inside callbacks (`() => remove(item!.id)` crashes on render while `item` is `null`). Guard inside instead: `async () => { if (item) await remove(item.id); }`.
+
 ### Language
 
 - UI copy in **Brazilian Portuguese (pt-BR)**; code, identifiers, and comments in English.
@@ -297,13 +315,21 @@ interface Notice {
 
 Permissions must be enforced in `firestore.rules`, not only in the UI:
 
-- `users/{uid}`: read/write only by the owner (a user can always set their own `houseId` to `null`).
+- `users/{uid}`: read/write only by the owner (a user can always set their own `houseId` to `null`); delete only when `houseId` is `null`.
 - `invites/{code}`: `get` by any authenticated user; `list` denied; write only by the house admin.
 - `houses/{houseId}` and subcollections: read only by members.
 - Joining: a user may create their own `members/{uid}` document only if they have no house and the house's invite code is valid.
 - `tasks`, `groups`, `notice_board`, house settings, house deletion: write only by the admin (`houses.ownerId == request.auth.uid`).
 - `members/{uid}`: a resident may delete their own document (leave); the admin may delete any resident's document (remove) and all documents when deleting the house.
 - `shopping_items`: write by any member.
+- Collections from later phases (`tasks`, `shopping_items`, `notice_board`) currently only allow member read + admin delete (needed for house deletion). Add create/update rules with each phase.
+
+### Testing
+
+- `pnpm test` — unit tests (Vitest) for `src/**/*.test.ts` (pure utils).
+- `pnpm test:rules` — security rules tests in `tests/rules/` against the Firestore emulator (demo project, never touches production). Requires **Java 21+** (`sudo update-alternatives --config java`, or set `JAVA_HOME`).
+- **Every rules change must come with tests.** Mirror the exact batch shapes used in `src/services/`.
+- Deploy rules after changing them: `firebase deploy --only firestore:rules`.
 
 ---
 
@@ -320,17 +346,20 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 
 ### Phase 2: House & Membership
 
-- [ ] Onboarding: create house (creator becomes admin and first resident).
-- [ ] Invite link: share (Web Share API / copy), regenerate code.
-- [ ] Invite landing page `/invite/[code]` with join flow and "already in a house" handling.
-- [ ] Member list; admin can remove residents.
-- [ ] Leave house flow for residents (with cleanup of groups and task rotations).
-- [ ] Delete house flow for the admin (with confirmation) + lazy `houseId` cleanup for other residents.
-- [ ] Group/Room creation UI and assignment of members (admin only).
+- [x] Onboarding: create house (creator becomes admin and first resident).
+- [x] Invite link: share (Web Share API / copy), regenerate code.
+- [x] Invite landing page `/invite/[code]` with join flow and "already in a house" handling.
+- [x] Member list; admin can remove residents.
+- [x] Leave house flow for residents (task rotation cleanup pending, see Phase 3).
+- [x] Delete house flow for the admin (with confirmation) + lazy `houseId` cleanup for other residents.
+- [x] Group/Room creation UI and assignment of members (admin only).
+- [x] Dashboard shell (header + bottom nav; Tasks/Shopping/Notices tabs disabled until their phase).
+- [x] Delete account (with reauthentication; deletes the house if admin).
 
 ### Phase 3: Task Rotations
 
 - [ ] Rotation utilities (`src/utils/rotation.ts`): current assignee, next assignee, next change date, re-anchoring.
+- [ ] Rules for `tasks` create/update (admin) + the "remove myself from rotations" exception used when leaving; update `leaveHouse` / `removeMember` / `deleteGroup` to clean rotations.
 - [ ] Task form (admin only): title, description, assignee type, ordered rotation, frequency, start date.
 - [ ] Task list showing current and next assignee and when the turn changes.
 - [ ] Dashboard highlight: "Your responsibilities right now".

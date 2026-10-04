@@ -1,19 +1,36 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
-import { signOutUser } from '@/services/authService';
+import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useHouseStore } from '@/store/useHouseStore';
 
-// Placeholder until Phase 3 ("who's on duty now")
+// "Who's on duty now" arrives with task rotations in Phase 3
 export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
+  const memberCount = useHouseStore((state) => state.members.length);
+  const firstName = profile?.displayName.split(' ')[0];
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-2xl font-semibold">Olá, {profile?.displayName}!</h1>
-      <Button variant="secondary" onClick={() => signOutUser()}>
-        Sair
-      </Button>
-    </main>
+    <>
+      <h1 className="text-2xl font-semibold">Olá, {firstName}!</h1>
+
+      <Card title="Suas responsabilidades" description="Os rodízios de tarefas chegam em breve." />
+
+      <Link href="/house" className="block">
+        <Card className="transition-colors hover:bg-surface-muted">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold">Moradores</p>
+              <p className="text-sm text-muted">
+                {memberCount} {memberCount === 1 ? 'pessoa' : 'pessoas'} na casa
+              </p>
+            </div>
+            <ChevronRight className="size-5 text-muted" />
+          </div>
+        </Card>
+      </Link>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import type { User as FirebaseUser } from 'firebase/auth';
 import {
+  deleteDoc,
   doc,
   onSnapshot,
   runTransaction,
@@ -47,4 +48,14 @@ export function subscribeToUserProfile(
 
 export function updateUserDisplayName(uid: string, displayName: string): Promise<void> {
   return updateDoc(userRef(uid), { displayName });
+}
+
+/** Security rules only allow this once the user has no house. */
+export function deleteUserProfile(uid: string): Promise<void> {
+  return deleteDoc(userRef(uid));
+}
+
+/** Lazy cleanup when the user's house was deleted or they were removed from it. */
+export function clearUserHouse(uid: string): Promise<void> {
+  return updateDoc(userRef(uid), { houseId: null });
 }

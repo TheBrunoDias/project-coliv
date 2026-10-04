@@ -3,6 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---------- Helpers ----------
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,6 +17,44 @@ service cloud.firestore {
       return name is string && name.size() > 0 && name.size() <= 60;
     }
 
+    function isValidName(name) {
+      return name is string && name.trim().size() > 0 && name.size() <= 60;
+    }
+
+    function isValidInviteCode(code) {
+      return code is string && code.matches('^[a-z0-9]{12}$');
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function housePath(houseId) {
+      return /databases/$(database)/documents/houses/$(houseId);
+    }
+
+    function memberPath(houseId, uid) {
+      return /databases/$(database)/documents/houses/$(houseId)/members/$(uid);
+    }
+
+    function invitePath(code) {
+      return /databases/$(database)/documents/invites/$(code);
+    }
+
+    function isMember(houseId) {
+      return isSignedIn() && exists(memberPath(houseId, request.auth.uid));
+    }
+
+    function isAdmin(houseId) {
+      return isSignedIn() && get(housePath(houseId)).data.ownerId == request.auth.uid;
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ---------- Users ----------
+
     match /users/{uid} {
       allow read: if isSelf(uid);
 
@@ -25,17 +65,145 @@ service cloud.firestore {
         && request.resource.data.houseId == null
         && request.resource.data.createdAt == request.time;
 
-      // Phase 1: houseId can only stay the same or be cleared.
-      // Phase 2 will allow setting it when joining/creating a house.
+      // houseId can stay the same, be cleared (leave / lazy cleanup), or be set from null
+      // when the same batch creates the user's member document (create house / join).
       allow update: if isSelf(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'houseId'])
+        && changedKeys().hasOnly(['displayName', 'photoURL', 'houseId'])
         && isValidDisplayName(request.resource.data.displayName)
         && (request.resource.data.houseId == resource.data.houseId
-            || request.resource.data.houseId == null);
+            || request.resource.data.houseId == null
+            || (resource.data.houseId == null
+                && request.resource.data.houseId is string
+                && existsAfter(memberPath(request.resource.data.houseId, uid))));
 
-      allow delete: if false;
+      // Account deletion: the house must be left/deleted first
+      allow delete: if isSelf(uid) && resource.data.houseId == null;
     }
 
-    // Everything else is denied until the matching phase adds its rules.
+    // ---------- Invites ----------
+
+    // Lookup table for invite links: anyone signed in can resolve a code they know,
+    // but nobody can list codes.
+    match /invites/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && isValidInviteCode(code)
+        && request.resource.data.keys().hasOnly(['houseId', 'houseName', 'createdAt'])
+        && getAfter(housePath(request.resource.data.houseId)).data.ownerId == request.auth.uid
+        && getAfter(housePath(request.resource.data.houseId)).data.inviteCode == code
+        && isValidName(request.resource.data.houseName)
+        && request.resource.data.createdAt == request.time;
+
+      // Keep houseName in sync when the house is renamed
+      allow update: if isSignedIn()
+        && changedKeys().hasOnly(['houseName'])
+        && isValidName(request.resource.data.houseName)
+        && get(housePath(resource.data.houseId)).data.ownerId == request.auth.uid;
+
+      allow delete: if isSignedIn()
+        && get(housePath(resource.data.houseId)).data.ownerId == request.auth.uid;
+    }
+
+    // ---------- Houses ----------
+
+    match /houses/{houseId} {
+      allow read: if isMember(houseId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['id', 'name', 'ownerId', 'inviteCode', 'createdAt'])
+        && request.resource.data.id == houseId
+        && request.resource.data.ownerId == request.auth.uid
+        && isValidName(request.resource.data.name)
+        && isValidInviteCode(request.resource.data.inviteCode)
+        && request.resource.data.createdAt == request.time
+        && getAfter(invitePath(request.resource.data.inviteCode)).data.houseId == houseId
+        && existsAfter(memberPath(houseId, request.auth.uid));
+
+      // Rename, or regenerate the invite code (new invite created + old one deleted in the same batch)
+      allow update: if isAdmin(houseId)
+        && changedKeys().hasOnly(['name', 'inviteCode'])
+        && isValidName(request.resource.data.name)
+        && (request.resource.data.inviteCode == resource.data.inviteCode
+            || (isValidInviteCode(request.resource.data.inviteCode)
+                && getAfter(invitePath(request.resource.data.inviteCode)).data.houseId == houseId
+                && !existsAfter(invitePath(resource.data.inviteCode))));
+
+      allow delete: if isAdmin(houseId);
+
+      // ---------- Members ----------
+
+      match /members/{memberId} {
+        allow read: if isMember(houseId);
+
+        // A user can only add themselves, while not in any house, and either
+        // as the creator of a brand-new house or with the house's current invite code.
+        allow create: if isSelf(memberId)
+          && request.resource.data.keys().hasOnly(['userId', 'displayName', 'photoURL', 'groupIds', 'joinedAt', 'inviteCode'])
+          && request.resource.data.userId == memberId
+          && isValidDisplayName(request.resource.data.displayName)
+          && request.resource.data.groupIds == []
+          && request.resource.data.joinedAt == request.time
+          && get(userPath(memberId)).data.houseId == null
+          && getAfter(userPath(memberId)).data.houseId == houseId
+          && ((!exists(housePath(houseId))
+                && getAfter(housePath(houseId)).data.ownerId == memberId)
+              || (exists(housePath(houseId))
+                && request.resource.data.inviteCode == get(housePath(houseId)).data.inviteCode));
+
+        // Admin manages group membership; members can refresh their own display info
+        allow update: if (isAdmin(houseId)
+            && changedKeys().hasOnly(['groupIds'])
+            && request.resource.data.groupIds is list)
+          || (isSelf(memberId)
+            && changedKeys().hasOnly(['displayName', 'photoURL'])
+            && isValidDisplayName(request.resource.data.displayName));
+
+        // Residents can leave; the admin can remove residents, and can only remove
+        // themselves as part of deleting the house.
+        allow delete: if isSignedIn()
+          && ((isSelf(memberId) && !isAdmin(houseId))
+              || (isAdmin(houseId)
+                  && (memberId != request.auth.uid || !existsAfter(housePath(houseId)))));
+      }
+
+      // ---------- Groups ----------
+
+      match /groups/{groupId} {
+        allow read: if isMember(houseId);
+
+        allow create: if isAdmin(houseId)
+          && request.resource.data.keys().hasOnly(['id', 'name', 'createdAt'])
+          && request.resource.data.id == groupId
+          && isValidName(request.resource.data.name)
+          && request.resource.data.createdAt == request.time;
+
+        allow update: if isAdmin(houseId)
+          && changedKeys().hasOnly(['name'])
+          && isValidName(request.resource.data.name);
+
+        allow delete: if isAdmin(houseId);
+      }
+
+      // ---------- Phase 3-5 collections ----------
+      // Create/update rules come with their phase; read + admin delete are needed now
+      // so the admin can delete the whole house.
+
+      match /tasks/{taskId} {
+        allow read: if isMember(houseId);
+        allow delete: if isAdmin(houseId);
+      }
+
+      match /shopping_items/{itemId} {
+        allow read: if isMember(houseId);
+        allow delete: if isAdmin(houseId);
+      }
+
+      match /notice_board/{noticeId} {
+        allow read: if isMember(houseId);
+        allow delete: if isAdmin(houseId);
+      }
+    }
   }
 }

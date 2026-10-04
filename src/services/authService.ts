@@ -1,11 +1,16 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   GoogleAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   updateProfile,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { ensureUserProfile, updateUserDisplayName } from './userService';
@@ -28,10 +33,36 @@ export async function registerWithEmail(
   await updateUserDisplayName(user.uid, displayName);
 }
 
-export async function signInWithGoogle(): Promise<void> {
+function googleProvider(): GoogleAuthProvider {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  await signInWithPopup(auth, provider);
+  return provider;
+}
+
+export async function signInWithGoogle(): Promise<void> {
+  await signInWithPopup(auth, googleProvider());
+}
+
+export type SignInMethod = 'google' | 'password';
+
+export function getSignInMethod(user: FirebaseUser): SignInMethod {
+  return user.providerData.some((provider) => provider.providerId === 'google.com')
+    ? 'google'
+    : 'password';
+}
+
+/** Sensitive operations (like deleting the account) require a recent sign-in. */
+export async function reauthenticate(user: FirebaseUser, password?: string): Promise<void> {
+  if (getSignInMethod(user) === 'google') {
+    await reauthenticateWithPopup(user, googleProvider());
+    return;
+  }
+  if (!user.email || !password) throw new Error('Password required to reauthenticate');
+  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+}
+
+export function deleteAuthUser(user: FirebaseUser): Promise<void> {
+  return deleteUser(user);
 }
 
 export function sendPasswordReset(email: string): Promise<void> {

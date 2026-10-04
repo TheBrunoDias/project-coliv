@@ -19,6 +19,7 @@ export interface House {
 
 export interface Invite {
   houseId: string;
+  houseName: string; // Shown to non-members on the invite page
   createdAt: Timestamp;
 }
 
@@ -28,6 +29,7 @@ export interface HouseMember {
   photoURL?: string;
   groupIds: string[];
   joinedAt: Timestamp;
+  inviteCode?: string; // Invite used to join; validated by security rules (absent for the admin)
 }
 
 export interface Group {

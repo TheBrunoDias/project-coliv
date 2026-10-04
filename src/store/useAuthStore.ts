@@ -10,10 +10,13 @@ interface AuthState {
   // Firestore profile; only set once status is 'authenticated'
   profile: User | null;
   error: string | null;
+  // Keeps the UI on a loader (no redirects) while the account is being deleted
+  deletingAccount: boolean;
   setLoading: () => void;
   setAuthenticated: (firebaseUser: FirebaseUser, profile: User) => void;
   setUnauthenticated: () => void;
   setError: (error: string) => void;
+  setDeletingAccount: (deletingAccount: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -21,10 +24,19 @@ export const useAuthStore = create<AuthState>()((set) => ({
   firebaseUser: null,
   profile: null,
   error: null,
+  deletingAccount: false,
   setLoading: () => set({ status: 'loading', error: null }),
   setAuthenticated: (firebaseUser, profile) =>
     set({ status: 'authenticated', firebaseUser, profile, error: null }),
   setUnauthenticated: () =>
-    set({ status: 'unauthenticated', firebaseUser: null, profile: null, error: null }),
-  setError: (error) => set({ status: 'error', error }),
+    set({
+      status: 'unauthenticated',
+      firebaseUser: null,
+      profile: null,
+      error: null,
+      deletingAccount: false,
+    }),
+  setError: (error) => set({ status: 'error', error, deletingAccount: false }),
+  setDeletingAccount: (deletingAccount) =>
+    set(deletingAccount ? { deletingAccount, status: 'loading' } : { deletingAccount }),
 }));

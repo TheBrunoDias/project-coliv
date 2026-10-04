@@ -35,10 +35,13 @@ export function useAuthListener() {
           unsubscribeProfile = subscribeToUserProfile(
             firebaseUser.uid,
             (profile) => {
+              // While deleting the account the profile changes and disappears on purpose
+              if (useAuthStore.getState().deletingAccount) return;
               if (profile) setAuthenticated(firebaseUser, profile);
               else setError(PROFILE_ERROR);
             },
             (error) => {
+              if (useAuthStore.getState().deletingAccount) return;
               console.error('Profile listener failed', error);
               setError(PROFILE_ERROR);
             },
