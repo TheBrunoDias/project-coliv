@@ -102,6 +102,9 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
 
 - **Only the admin** can create, edit, and delete house rules and announcements.
 - All residents can read them.
+- **Rules** (`isRule: true`) are a numbered list at the top of the Mural, in creation order. **Announcements** are cards with author and date, newest first ("· editado" when `updatedAt` is set).
+- A notice needs a title (≤ 100); `content` is optional (≤ 2000, empty string when absent).
+- The dashboard shows the latest announcement if it is less than 7 days old.
 
 ---
 
@@ -344,7 +347,8 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 - `tasks`, `groups`, `notice_board`, house settings, house deletion: write only by the admin (`houses.ownerId == request.auth.uid`).
 - `members/{uid}`: a resident may delete their own document (leave); the admin may delete any resident's document (remove) and all documents when deleting the house.
 - `purchases`: create by any member as the payer (`paidBy == uid`); update/delete by the payer or the admin; `paidBy`, `splitCount` and `createdAt` are immutable.
-- `notice_board` currently only allows member read + admin delete (needed for house deletion). Add create/update rules in Phase 5.
+- `notice_board`: read by members; create/update/delete by the admin only.
+- `shopping_items` (legacy): read by members, delete by the admin; no writes.
 
 ### Testing
 
@@ -375,7 +379,7 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 - [x] Leave house flow for residents (task rotation cleanup pending, see Phase 3).
 - [x] Delete house flow for the admin (with confirmation) + lazy `houseId` cleanup for other residents.
 - [x] Group/Room creation UI and assignment of members (admin only).
-- [x] Dashboard shell (header + bottom nav; Tasks/Shopping/Notices tabs disabled until their phase).
+- [x] Dashboard shell (header + bottom nav).
 - [x] Delete account (with reauthentication; deletes the house if admin).
 
 ### Phase 3: Task Rotations
@@ -395,9 +399,10 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 
 ### Phase 5: Notice Board
 
-- [ ] Permanent house rules section.
-- [ ] Announcement cards with author details.
-- [ ] Notice form (admin only).
+- [x] Permanent house rules section.
+- [x] Announcement cards with author details.
+- [x] Notice form (admin only).
+- [x] Latest announcement on the dashboard.
 
 ### Phase 6: PWA Configuration & Optimization
 

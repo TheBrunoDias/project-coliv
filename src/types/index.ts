@@ -74,8 +74,9 @@ export interface Purchase {
 export interface Notice {
   id: string;
   title: string;
-  content: string;
+  content: string; // May be empty (e.g. a short rule)
   isRule: boolean; // true = permanent house rule, false = temporary announcement
   createdBy: string;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }

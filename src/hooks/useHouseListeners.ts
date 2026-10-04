@@ -4,6 +4,7 @@ import type { FirestoreError } from 'firebase/firestore';
 import { useEffect } from 'react';
 import { subscribeToGroups } from '@/services/groupService';
 import { isConfirmedMember, subscribeToHouse, subscribeToMembers } from '@/services/houseService';
+import { subscribeToNotices } from '@/services/noticeService';
 import { subscribeToPurchases } from '@/services/purchaseService';
 import { subscribeToTasks } from '@/services/taskService';
 import { clearUserHouse } from '@/services/userService';
@@ -15,7 +16,7 @@ import { useHouseStore } from '@/store/useHouseStore';
  */
 export function useHouseListeners(houseId: string, uid: string) {
   useEffect(() => {
-    const { setHouse, setMembers, setGroups, setTasks, setPurchases, reset } =
+    const { setHouse, setMembers, setGroups, setTasks, setPurchases, setNotices, reset } =
       useHouseStore.getState();
     let unsubscribers: (() => void)[] = [];
     let active = true;
@@ -73,6 +74,7 @@ export function useHouseListeners(houseId: string, uid: string) {
         subscribeToGroups(houseId, setGroups, handleError),
         subscribeToTasks(houseId, setTasks, handleError),
         subscribeToPurchases(houseId, setPurchases, handleError),
+        subscribeToNotices(houseId, setNotices, handleError),
       ];
     }
 

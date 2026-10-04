@@ -240,10 +240,6 @@ service cloud.firestore {
         allow delete: if isAdmin(houseId);
       }
 
-      // ---------- Phase 5 collections ----------
-      // Create/update rules come with their phase; read + admin delete are needed now
-      // so the admin can delete the whole house.
-
       // ---------- Purchases ----------
 
       // Shared expenses: whoever paid registers the purchase; it is split equally among the
@@ -292,52 +288,32 @@ service cloud.firestore {
         allow delete: if isAdmin(houseId);
       }
 
-      // ---------- Phase 5 collections ----------
-      // Create/update rules come with their phase; read + admin delete are needed now
-      // so the admin can delete the whole house.
+      // ---------- Notice board ----------
 
-      // ---------- Shopping list ----------
-
-      // Shared list: every member can add, edit, check off and remove items.
-      match /shopping_items/{itemId} {
-        function isValidItem(item) {
-          return item.keys().hasAll(['id', 'title', 'isPurchased', 'createdBy', 'createdAt'])
-            && item.keys().hasOnly(['id', 'title', 'quantity', 'isPurchased', 'createdBy', 'purchasedBy', 'createdAt', 'purchasedAt'])
-            && item.id == itemId
-            && item.title is string && item.title.trim().size() > 0 && item.title.size() <= 80
-            && (!('quantity' in item) || (item.quantity is string && item.quantity.size() <= 30))
-            && item.isPurchased is bool;
+      // House rules (isRule) and announcements: written by the admin, read by everyone.
+      match /notice_board/{noticeId} {
+        function isValidNotice(notice) {
+          return notice.keys().hasAll(['id', 'title', 'content', 'isRule', 'createdBy', 'createdAt'])
+            && notice.keys().hasOnly(['id', 'title', 'content', 'isRule', 'createdBy', 'createdAt', 'updatedAt'])
+            && notice.id == noticeId
+            && notice.title is string && notice.title.trim().size() > 0 && notice.title.size() <= 100
+            && notice.content is string && notice.content.size() <= 2000
+            && notice.isRule is bool;
         }
 
         allow read: if isMember(houseId);
 
-        allow create: if isMember(houseId)
-          && isValidItem(request.resource.data)
+        allow create: if isAdmin(houseId)
+          && isValidNotice(request.resource.data)
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time
-          && request.resource.data.isPurchased == false
-          && !('purchasedBy' in request.resource.data)
-          && !('purchasedAt' in request.resource.data);
+          && !('updatedAt' in request.resource.data);
 
-        // "Purchased by" is always whoever checks the item off, at that moment.
-        allow update: if isMember(houseId)
-          && isValidItem(request.resource.data)
+        allow update: if isAdmin(houseId)
+          && isValidNotice(request.resource.data)
           && !changedKeys().hasAny(['id', 'createdBy', 'createdAt'])
-          && (!changedKeys().hasAny(['isPurchased', 'purchasedBy', 'purchasedAt'])
-              || (changedKeys().hasAny(['isPurchased'])
-                  && request.resource.data.isPurchased == true
-                  && request.resource.data.purchasedBy == request.auth.uid
-                  && request.resource.data.purchasedAt == request.time)
-              || (changedKeys().hasAny(['isPurchased'])
-                  && request.resource.data.isPurchased == false
-                  && !('purchasedBy' in request.resource.data)
-                  && !('purchasedAt' in request.resource.data)));
+          && request.resource.data.updatedAt == request.time;
 
-        allow delete: if isMember(houseId);
-      }
-
-      match /notice_board/{noticeId} {
-        allow read: if isMember(houseId);
         allow delete: if isAdmin(houseId);
       }
     }

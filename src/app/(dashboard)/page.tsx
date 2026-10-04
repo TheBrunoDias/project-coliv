@@ -2,6 +2,7 @@
 
 import { ChevronRight, PartyPopper, Receipt } from 'lucide-react';
 import Link from 'next/link';
+import { AnnouncementCard } from '@/components/notices/AnnouncementCard';
 import { AssigneeAvatar } from '@/components/tasks/AssigneeAvatar';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Card } from '@/components/ui/Card';
@@ -12,15 +13,25 @@ import { useHouseStore } from '@/store/useHouseStore';
 import { formatMoney, getHouseCurrency } from '@/utils/money';
 import { getMonthSummary } from '@/utils/purchases';
 
+const RECENT_ANNOUNCEMENT_MS = 7 * 86_400_000;
+
 export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
   const views = useTaskViews();
   const house = useHouseStore((state) => state.house);
   const purchases = useHouseStore((state) => state.purchases);
+  const notices = useHouseStore((state) => state.notices);
+  const members = useHouseStore((state) => state.members);
   const now = useNow();
   const month = getMonthSummary(purchases, now);
   const currency = getHouseCurrency(house);
   const firstName = profile?.displayName.split(' ')[0];
+
+  // Notices are sorted newest first; only surface recent announcements
+  const latestAnnouncement = notices.find((notice) => !notice.isRule);
+  const showAnnouncement =
+    latestAnnouncement &&
+    now.getTime() - latestAnnouncement.createdAt.toMillis() < RECENT_ANNOUNCEMENT_MS;
 
   const mine = views.filter((view) => view.isMine);
   const onDuty = views.filter((view) => view.status === 'active' && view.current);
@@ -28,6 +39,24 @@ export default function DashboardPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Olá, {firstName}!</h1>
+
+      {showAnnouncement && latestAnnouncement && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Último aviso</h2>
+            <Link href="/notices" className="flex items-center text-sm font-medium text-brand">
+              Ver mural
+              <ChevronRight className="size-4" />
+            </Link>
+          </div>
+          <AnnouncementCard
+            notice={latestAnnouncement}
+            members={members}
+            uid={profile?.uid ?? ''}
+            now={now}
+          />
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Suas responsabilidades agora</h2>

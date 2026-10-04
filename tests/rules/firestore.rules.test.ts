@@ -474,6 +474,71 @@ describe('house currency', () => {
   });
 });
 
+describe('notice board', () => {
+  const noticeRef = (uid: string) => doc(dbAs(uid), 'houses', HOUSE_ID, 'notice_board', 'n1');
+  const newNotice = (createdBy: string, isRule = false) => ({
+    id: 'n1',
+    title: 'Silêncio após as 22h',
+    content: '',
+    isRule,
+    createdBy,
+    createdAt: serverTimestamp(),
+  });
+
+  it('lets only the admin publish rules and announcements', async () => {
+    await seedHouse('admin', ['ana']);
+    await assertFails(setDoc(noticeRef('ana'), newNotice('ana')));
+    await assertSucceeds(setDoc(noticeRef('admin'), newNotice('admin', true)));
+    await assertSucceeds(getDoc(noticeRef('ana')));
+  });
+
+  it('rejects invalid notices', async () => {
+    await seedHouse('admin');
+    await assertFails(setDoc(noticeRef('admin'), { ...newNotice('admin'), title: ' ' }));
+    await assertFails(setDoc(noticeRef('admin'), { ...newNotice('admin'), isRule: 'yes' }));
+    await assertFails(setDoc(noticeRef('admin'), { ...newNotice('admin'), pinned: true }));
+  });
+
+  it('lets only the admin edit and delete', async () => {
+    await seedHouse('admin', ['ana']);
+    await seed((db) =>
+      setDoc(doc(db, 'houses', HOUSE_ID, 'notice_board', 'n1'), {
+        ...newNotice('admin'),
+        createdAt: new Date(),
+      }),
+    );
+    const edit = { content: 'Vale também aos fins de semana.', updatedAt: serverTimestamp() };
+    await assertFails(updateDoc(noticeRef('ana'), edit));
+    await assertFails(deleteDoc(noticeRef('ana')));
+    await assertSucceeds(updateDoc(noticeRef('admin'), edit));
+    await assertFails(
+      updateDoc(noticeRef('admin'), { createdBy: 'ana', updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(deleteDoc(noticeRef('admin')));
+  });
+});
+
+describe('legacy shopping list', () => {
+  it('no longer accepts writes, only admin deletion of old data', async () => {
+    await seedHouse('admin', ['ana']);
+    const itemRef = (uid: string) => doc(dbAs(uid), 'houses', HOUSE_ID, 'shopping_items', 'i1');
+    await assertFails(
+      setDoc(itemRef('ana'), {
+        id: 'i1',
+        title: 'Leite',
+        isPurchased: false,
+        createdBy: 'ana',
+        createdAt: serverTimestamp(),
+      }),
+    );
+    await seed((db) =>
+      setDoc(doc(db, 'houses', HOUSE_ID, 'shopping_items', 'i1'), { id: 'i1', title: 'Leite' }),
+    );
+    await assertFails(deleteDoc(itemRef('ana')));
+    await assertSucceeds(deleteDoc(itemRef('admin')));
+  });
+});
+
 describe('groups', () => {
   it('lets only the admin create groups and assign members', async () => {
     await seedHouse('admin', ['ana']);
