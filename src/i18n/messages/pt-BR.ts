@@ -29,6 +29,14 @@ export const ptBR = {
     language: 'Idioma',
   },
 
+  offline: {
+    title: 'Você está offline',
+    description:
+      'Esta tela ainda não foi aberta neste aparelho. Verifique sua conexão; as telas que você já visitou continuam funcionando sem internet.',
+    retry: 'Tentar novamente',
+    goHome: 'Ir para o início',
+  },
+
   nav: {
     home: 'Início',
     tasks: 'Tarefas',

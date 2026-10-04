@@ -124,7 +124,10 @@ src/
 │   ├── invite/
 │   │   └── [code]/page.tsx   # Invite link landing page
 │   ├── onboarding/           # Create house (users without a house)
-│   ├── layout.tsx            # Root layout & AuthListener
+│   ├── serwist/[path]/       # Route that builds/serves the service worker (/serwist/sw.js)
+│   ├── ~offline/             # Offline fallback page (precached)
+│   ├── sw.ts                 # Service worker source (Serwist)
+│   ├── layout.tsx            # Root layout, AuthListener, LocaleSync, ServiceWorker
 │   └── manifest.ts           # PWA Manifest configuration
 ├── components/               # React Components
 │   ├── ui/                   # Low-level reusable components (Buttons, Modals, Inputs)
@@ -315,6 +318,10 @@ interface Notice {
 
 - Layout optimized for mobile viewports (`h-dvh`, bottom navigation bar).
 - Disable pull-to-refresh on mobile where necessary to feel native.
+- **Manifest**: `src/app/manifest.ts`. **Icons**: `public/icons/*` (any + maskable), `src/app/icon.svg` (favicon), `src/app/apple-icon.png`. All generated from one SVG by `node scripts/generate-icons.mjs` — edit the glyph/color there and re-run instead of editing PNGs.
+- **Service worker** (Serwist, Turbopack): source `src/app/sw.ts`, built and served at `/serwist/sw.js` by the route `src/app/serwist/[path]/route.ts`, registered by `components/pwa/ServiceWorker.tsx` (**disabled in development**; test with `pnpm build && pnpm start`).
+- The SW only caches **same-origin** requests (Serwist's `defaultCache` filtered). Never let it handle Firebase/Google requests: Firestore's streaming listen channel breaks behind a caching strategy, and Firestore already has its own IndexedDB offline cache.
+- Navigating offline to a page that was never visited shows the precached `/~offline` page (translated, client component).
 
 ### Permissions
 
@@ -415,9 +422,9 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 
 ### Phase 6: PWA Configuration & Optimization
 
-- [ ] Configure Next.js Manifest (`app/manifest.ts`) and PWA icons.
-- [ ] Service worker with Serwist (Turbopack setup).
-- [ ] Verify Firestore offline persistence (already enabled in `src/lib/firebase.ts`).
+- [x] Configure Next.js Manifest (`app/manifest.ts`) and PWA icons.
+- [x] Service worker with Serwist (Turbopack setup) + offline fallback page.
+- [ ] Verify on a real phone over HTTPS (install, offline navigation, Firestore offline cache).
 
 ---
 

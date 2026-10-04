@@ -24,6 +24,14 @@ export const en: Messages = {
     language: 'Language',
   },
 
+  offline: {
+    title: "You're offline",
+    description:
+      "This screen hasn't been opened on this device yet. Check your connection; screens you've already visited keep working without internet.",
+    retry: 'Try again',
+    goHome: 'Go to home',
+  },
+
   nav: {
     home: 'Home',
     tasks: 'Tasks',
