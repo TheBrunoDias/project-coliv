@@ -9,11 +9,14 @@ export interface User {
   createdAt: Timestamp;
 }
 
+export type Currency = 'EUR' | 'BRL' | 'USD' | 'GBP';
+
 export interface House {
   id: string;
   name: string;
   ownerId: string; // Creator of the house = the only admin
   inviteCode: string;
+  currency?: Currency; // Defaults to EUR for houses created before this field existed
   createdAt: Timestamp;
 }
 
@@ -56,15 +59,16 @@ export interface Task {
   updatedAt: Timestamp;
 }
 
-export interface ShoppingItem {
+export interface Purchase {
   id: string;
-  title: string;
-  quantity?: string;
-  isPurchased: boolean;
-  createdBy: string;
-  purchasedBy?: string;
+  description?: string; // e.g. "Compra do mês no supermercado"
+  items: string[]; // What was bought (may be empty when there is a description)
+  amountCents: number; // Total paid, in cents of the house currency
+  date: Timestamp; // Day of the purchase
+  paidBy: string; // userId
+  splitCount: number; // Residents in the house when it was registered (keeps history stable)
   createdAt: Timestamp;
-  purchasedAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Notice {

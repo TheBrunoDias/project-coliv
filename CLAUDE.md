@@ -4,7 +4,7 @@
 
 ## 📌 Project Overview
 
-Mobile-first PWA built with Next.js for organizing shared household chores, shopping lists, and notice boards among housemates (e.g., student accommodation).
+Mobile-first PWA built with Next.js for organizing shared household chores, shared purchases (expense splitting), and notice boards among housemates (e.g., student accommodation).
 
 Tasks are **reminders, not checklists**: they are never marked as completed. Their purpose is to show everyone who is currently responsible for each chore (e.g., "this week Ana takes out the trash"), with responsibility rotating automatically over time.
 
@@ -73,7 +73,7 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
 ### Deleting a House
 
 - Only the admin can delete the house.
-- Deletion removes the house document, all its subcollections (`members`, `groups`, `tasks`, `shopping_items`, `notice_board`) and its `invites` document, using batched writes (max 500 operations per batch).
+- Deletion removes the house document, all its subcollections (`members`, `groups`, `tasks`, `purchases`, legacy `shopping_items`, `notice_board`) and its `invites` document, using batched writes (max 500 operations per batch).
 - The admin's own `users.houseId` is set to `null` in the same operation.
 - Other residents' `users.houseId` cannot be written by the admin (security rules), so it is **cleared lazily** by `useHouseListeners`: when a listener gets `permission-denied`, the house is missing, or the user is not in `members`, it waits for pending writes and asks the server (`isConfirmedMember`) before clearing `houseId` — listeners can run ahead of a just-committed create/join batch.
 
@@ -86,7 +86,17 @@ Tasks are **reminders, not checklists**: they are never marked as completed. The
   3. Delete `users/{uid}` (rules only allow it once `houseId` is `null`).
   4. Delete the Firebase Auth user, which signs them out.
 - While it runs, `useAuthStore.deletingAccount` keeps the UI on a loader so the profile listener does not redirect or show errors midway.
-- Content the user created in other places (e.g. shopping items `createdBy`) stays; the UI must handle unknown user ids gracefully (e.g. "Ex-morador").
+- Content the user created in other places (e.g. purchases `paidBy`) stays; the UI must handle unknown user ids gracefully (e.g. "Ex-morador").
+
+### Purchases (Shared Expenses)
+
+- Replaces the old "to buy" shopping list. **Any member** registers something they bought for the house: an optional **description** (e.g. "Compra do mês no supermercado"), the items, the **total paid**, and the date. It needs a description, items, or both — for big shopping trips the description alone is enough.
+- Each purchase is split **equally among all residents**: the app shows the value per person (no per-room split, no balances / "who owes whom" — settling up happens outside the app).
+- `splitCount` = number of residents when the purchase was registered; it never changes afterwards (people joining/leaving later do not rewrite history).
+- Money is stored as integer cents (`amountCents`); parse input with `parseAmount` ("12,50", "12.50", "1.234,56") and display with `formatMoney`.
+- Currency is a house setting (`houses.currency`: EUR, BRL, USD, GBP; default EUR), chosen when creating the house and changeable by the admin.
+- Only the payer or the admin can edit/delete a purchase; nobody can change `paidBy` or `splitCount`.
+- The Compras page groups purchases by month with "total" and "per person" (sum of each purchase's share); the dashboard shows the current month.
 
 ### Notice Board
 
@@ -104,7 +114,7 @@ src/
 │   ├── (dashboard)/          # Authenticated app routes
 │   │   ├── house/            # House settings, members, groups, invite link
 │   │   ├── tasks/            # Task rotations & current assignees
-│   │   ├── shopping/         # Shared shopping list
+│   │   ├── shopping/         # Purchases & expense split ("Compras" tab)
 │   │   ├── notices/          # Notice board & rules
 │   │   ├── layout.tsx        # Dashboard layout with Bottom Nav
 │   │   └── page.tsx          # "/" — Dashboard overview ("who's on duty now")
@@ -118,7 +128,7 @@ src/
 │   ├── auth/                 # Auth forms & Protected Route wrappers
 │   ├── house/                # House setup, Invite link share, Member list, Group cards
 │   ├── tasks/                # Task cards, Task form (admin), Rotation editor
-│   ├── shopping/             # Shopping list, Add item, Purchased history
+│   ├── purchases/            # Purchase card, Purchase form, Items chips input
 │   ├── notices/              # Notice board cards, Rules section
 │   └── navigation/           # Mobile Bottom Nav, Header
 ├── lib/                      # External library configurations
@@ -164,6 +174,7 @@ interface House {
   name: string;
   ownerId: string; // Creator of the house = the only admin
   inviteCode: string; // Random, URL-safe code used in /invite/{inviteCode}
+  currency?: 'EUR' | 'BRL' | 'USD' | 'GBP'; // Purchases currency, default EUR
   createdAt: Timestamp;
 }
 ```
@@ -230,22 +241,25 @@ interface Task {
 }
 ```
 
-### 7. `houses/{houseId}/shopping_items` Subcollection
+### 7. `houses/{houseId}/purchases` Subcollection
 
-Document ID: `{itemId}`
+Document ID: `{purchaseId}`
 
 ```typescript
-interface ShoppingItem {
+interface Purchase {
   id: string;
-  title: string;
-  quantity?: string;
-  isPurchased: boolean;
-  createdBy: string; // userId
-  purchasedBy?: string; // userId
+  description?: string; // Optional, up to 200 chars
+  items: string[]; // What was bought (may be empty when there is a description)
+  amountCents: number; // Total paid, in cents of the house currency
+  date: Timestamp; // Day of the purchase
+  paidBy: string; // userId
+  splitCount: number; // Residents when registered (keeps history stable)
   createdAt: Timestamp;
-  purchasedAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 ```
+
+> `shopping_items` is a legacy collection (old shopping list). It is no longer written; rules only allow reading and admin deletion so old houses can still be deleted.
 
 ### 8. `houses/{houseId}/notice_board` Subcollection
 
@@ -300,7 +314,9 @@ interface Notice {
 | Manage groups and group membership | ✅ | ❌ |
 | Edit house settings, share / regenerate invite link | ✅ | ❌ |
 | Remove residents | ✅ | ❌ |
-| Manage shopping items | ✅ | ✅ |
+| Register purchases | ✅ | ✅ |
+| Edit / delete a purchase | ✅ (any) | Only their own |
+| Change the house currency | ✅ | ❌ |
 | Create / edit / delete notices and rules | ✅ | ❌ |
 | Read notices and rules | ✅ | ✅ |
 | Leave the house | ❌ (must delete the house) | ✅ |
@@ -327,8 +343,8 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 - Joining: a user may create their own `members/{uid}` document only if they have no house and the house's invite code is valid.
 - `tasks`, `groups`, `notice_board`, house settings, house deletion: write only by the admin (`houses.ownerId == request.auth.uid`).
 - `members/{uid}`: a resident may delete their own document (leave); the admin may delete any resident's document (remove) and all documents when deleting the house.
-- `shopping_items`: write by any member.
-- Collections from later phases (`shopping_items`, `notice_board`) currently only allow member read + admin delete (needed for house deletion). Add create/update rules with each phase.
+- `purchases`: create by any member as the payer (`paidBy == uid`); update/delete by the payer or the admin; `paidBy`, `splitCount` and `createdAt` are immutable.
+- `notice_board` currently only allows member read + admin delete (needed for house deletion). Add create/update rules in Phase 5.
 
 ### Testing
 
@@ -370,10 +386,12 @@ Permissions must be enforced in `firestore.rules`, not only in the UI:
 - [x] Task list showing current and next assignee and when the turn changes.
 - [x] Dashboard highlight: "Your responsibilities right now".
 
-### Phase 4: Shared Shopping List
+### Phase 4: Shared Purchases
 
-- [ ] Real-time shopping list with item addition and quantity.
-- [ ] Toggle purchased status (showing creator vs. purchaser).
+- [x] Register purchases (items, total, date) with equal split per resident.
+- [x] Monthly grouping with total and per-person share; dashboard summary.
+- [x] House currency setting (create form + admin setting).
+- [x] Edit/delete by payer or admin.
 
 ### Phase 5: Notice Board
 

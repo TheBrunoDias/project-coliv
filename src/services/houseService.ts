@@ -7,12 +7,13 @@ import {
   getDocs,
   onSnapshot,
   serverTimestamp,
+  updateDoc,
   waitForPendingWrites,
   writeBatch,
   type DocumentReference,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { House, HouseMember, Invite, User } from '@/types';
+import type { Currency, House, HouseMember, Invite, User } from '@/types';
 import { generateInviteCode, isValidInviteCode } from '@/utils/inviteCode';
 import { removeFromRotations } from './taskService';
 
@@ -20,7 +21,8 @@ import { removeFromRotations } from './taskService';
 const BATCH_SIZE = 400;
 
 // Subcollections removed when the admin deletes the house (members are handled separately)
-const HOUSE_SUBCOLLECTIONS = ['tasks', 'shopping_items', 'notice_board', 'groups'];
+// ('shopping_items' is legacy data from before purchases)
+const HOUSE_SUBCOLLECTIONS = ['tasks', 'purchases', 'shopping_items', 'notice_board', 'groups'];
 
 const houseRef = (houseId: string) => doc(db, 'houses', houseId);
 const memberRef = (houseId: string, uid: string) => doc(db, 'houses', houseId, 'members', uid);
@@ -39,7 +41,11 @@ function memberData(profile: User) {
 
 // ---------- Create / join ----------
 
-export async function createHouse(name: string, profile: User): Promise<string> {
+export async function createHouse(
+  name: string,
+  currency: Currency,
+  profile: User,
+): Promise<string> {
   const ref = doc(collection(db, 'houses'));
   const inviteCode = generateInviteCode();
   const batch = writeBatch(db);
@@ -49,6 +55,7 @@ export async function createHouse(name: string, profile: User): Promise<string> 
     name,
     ownerId: profile.uid,
     inviteCode,
+    currency,
     createdAt: serverTimestamp(),
   });
   batch.set(inviteRef(inviteCode), { houseId: ref.id, houseName: name, createdAt: serverTimestamp() });
@@ -79,6 +86,10 @@ export async function renameHouse(house: House, name: string): Promise<void> {
   batch.update(houseRef(house.id), { name });
   batch.update(inviteRef(house.inviteCode), { houseName: name });
   await batch.commit();
+}
+
+export function updateHouseCurrency(houseId: string, currency: Currency): Promise<void> {
+  return updateDoc(houseRef(houseId), { currency });
 }
 
 /** Creates a new invite link and invalidates the previous one. */

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, PartyPopper } from 'lucide-react';
+import { ChevronRight, PartyPopper, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { AssigneeAvatar } from '@/components/tasks/AssigneeAvatar';
 import { TaskCard } from '@/components/tasks/TaskCard';
@@ -8,11 +8,18 @@ import { Card } from '@/components/ui/Card';
 import { useNow } from '@/hooks/useNow';
 import { useTaskViews } from '@/hooks/useTaskViews';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useHouseStore } from '@/store/useHouseStore';
+import { formatMoney, getHouseCurrency } from '@/utils/money';
+import { getMonthSummary } from '@/utils/purchases';
 
 export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
   const views = useTaskViews();
+  const house = useHouseStore((state) => state.house);
+  const purchases = useHouseStore((state) => state.purchases);
   const now = useNow();
+  const month = getMonthSummary(purchases, now);
+  const currency = getHouseCurrency(house);
   const firstName = profile?.displayName.split(' ')[0];
 
   const mine = views.filter((view) => view.isMine);
@@ -37,6 +44,23 @@ export default function DashboardPage() {
           </Card>
         )}
       </section>
+
+      <Link href="/shopping" className="block">
+        <Card className="transition-colors hover:bg-surface-muted">
+          <div className="flex items-center gap-3">
+            <Receipt className="size-5 shrink-0 text-brand" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">Compras do mês</p>
+              <p className="text-sm text-muted">
+                {month
+                  ? `${formatMoney(month.totalCents, currency)} no total · ${formatMoney(month.perPersonCents, currency)} por pessoa`
+                  : 'Nenhuma compra registrada este mês'}
+              </p>
+            </div>
+            <ChevronRight className="size-5 text-muted" />
+          </div>
+        </Card>
+      </Link>
 
       {onDuty.length > 0 && (
         <Card

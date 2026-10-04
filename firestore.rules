@@ -49,6 +49,10 @@ service cloud.firestore {
       return isSignedIn() && get(housePath(houseId)).data.ownerId == request.auth.uid;
     }
 
+    function isValidCurrency(house) {
+      return !('currency' in house) || house.currency in ['EUR', 'BRL', 'USD', 'GBP'];
+    }
+
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -112,19 +116,22 @@ service cloud.firestore {
       allow read: if isMember(houseId);
 
       allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['id', 'name', 'ownerId', 'inviteCode', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'name', 'ownerId', 'inviteCode', 'currency', 'createdAt'])
         && request.resource.data.id == houseId
         && request.resource.data.ownerId == request.auth.uid
         && isValidName(request.resource.data.name)
         && isValidInviteCode(request.resource.data.inviteCode)
+        && isValidCurrency(request.resource.data)
         && request.resource.data.createdAt == request.time
         && getAfter(invitePath(request.resource.data.inviteCode)).data.houseId == houseId
         && existsAfter(memberPath(houseId, request.auth.uid));
 
-      // Rename, or regenerate the invite code (new invite created + old one deleted in the same batch)
+      // Rename, change currency, or regenerate the invite code
+      // (new invite created + old one deleted in the same batch)
       allow update: if isAdmin(houseId)
-        && changedKeys().hasOnly(['name', 'inviteCode'])
+        && changedKeys().hasOnly(['name', 'inviteCode', 'currency'])
         && isValidName(request.resource.data.name)
+        && isValidCurrency(request.resource.data)
         && (request.resource.data.inviteCode == resource.data.inviteCode
             || (isValidInviteCode(request.resource.data.inviteCode)
                 && getAfter(invitePath(request.resource.data.inviteCode)).data.houseId == houseId
@@ -233,13 +240,100 @@ service cloud.firestore {
         allow delete: if isAdmin(houseId);
       }
 
-      // ---------- Phase 4-5 collections ----------
+      // ---------- Phase 5 collections ----------
       // Create/update rules come with their phase; read + admin delete are needed now
       // so the admin can delete the whole house.
 
+      // ---------- Purchases ----------
+
+      // Shared expenses: whoever paid registers the purchase; it is split equally among the
+      // `splitCount` residents living in the house at that moment.
+      match /purchases/{purchaseId} {
+        function isValidPurchase(purchase) {
+          return purchase.keys().hasAll(['id', 'items', 'amountCents', 'date', 'paidBy', 'splitCount', 'createdAt'])
+            && purchase.keys().hasOnly(['id', 'description', 'items', 'amountCents', 'date', 'paidBy', 'splitCount', 'createdAt', 'updatedAt'])
+            && purchase.id == purchaseId
+            && purchase.items is list && purchase.items.size() <= 30
+            && (!('description' in purchase)
+                || (purchase.description is string
+                    && purchase.description.trim().size() > 0
+                    && purchase.description.size() <= 200))
+            // Needs a list of items, a description, or both
+            && (purchase.items.size() > 0 || 'description' in purchase)
+            && purchase.amountCents is int && purchase.amountCents > 0 && purchase.amountCents <= 100000000
+            && purchase.date is timestamp
+            && purchase.splitCount is int && purchase.splitCount >= 1 && purchase.splitCount <= 50;
+        }
+
+        function isPayerOrAdmin() {
+          return resource.data.paidBy == request.auth.uid || isAdmin(houseId);
+        }
+
+        allow read: if isMember(houseId);
+
+        allow create: if isMember(houseId)
+          && isValidPurchase(request.resource.data)
+          && request.resource.data.paidBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && !('updatedAt' in request.resource.data);
+
+        allow update: if isMember(houseId)
+          && isPayerOrAdmin()
+          && isValidPurchase(request.resource.data)
+          && !changedKeys().hasAny(['id', 'paidBy', 'splitCount', 'createdAt'])
+          && request.resource.data.updatedAt == request.time;
+
+        allow delete: if isMember(houseId) && isPayerOrAdmin();
+      }
+
+      // Legacy shopping list (replaced by purchases); kept so old data can be deleted
       match /shopping_items/{itemId} {
         allow read: if isMember(houseId);
         allow delete: if isAdmin(houseId);
+      }
+
+      // ---------- Phase 5 collections ----------
+      // Create/update rules come with their phase; read + admin delete are needed now
+      // so the admin can delete the whole house.
+
+      // ---------- Shopping list ----------
+
+      // Shared list: every member can add, edit, check off and remove items.
+      match /shopping_items/{itemId} {
+        function isValidItem(item) {
+          return item.keys().hasAll(['id', 'title', 'isPurchased', 'createdBy', 'createdAt'])
+            && item.keys().hasOnly(['id', 'title', 'quantity', 'isPurchased', 'createdBy', 'purchasedBy', 'createdAt', 'purchasedAt'])
+            && item.id == itemId
+            && item.title is string && item.title.trim().size() > 0 && item.title.size() <= 80
+            && (!('quantity' in item) || (item.quantity is string && item.quantity.size() <= 30))
+            && item.isPurchased is bool;
+        }
+
+        allow read: if isMember(houseId);
+
+        allow create: if isMember(houseId)
+          && isValidItem(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.isPurchased == false
+          && !('purchasedBy' in request.resource.data)
+          && !('purchasedAt' in request.resource.data);
+
+        // "Purchased by" is always whoever checks the item off, at that moment.
+        allow update: if isMember(houseId)
+          && isValidItem(request.resource.data)
+          && !changedKeys().hasAny(['id', 'createdBy', 'createdAt'])
+          && (!changedKeys().hasAny(['isPurchased', 'purchasedBy', 'purchasedAt'])
+              || (changedKeys().hasAny(['isPurchased'])
+                  && request.resource.data.isPurchased == true
+                  && request.resource.data.purchasedBy == request.auth.uid
+                  && request.resource.data.purchasedAt == request.time)
+              || (changedKeys().hasAny(['isPurchased'])
+                  && request.resource.data.isPurchased == false
+                  && !('purchasedBy' in request.resource.data)
+                  && !('purchasedAt' in request.resource.data)));
+
+        allow delete: if isMember(houseId);
       }
 
       match /notice_board/{noticeId} {

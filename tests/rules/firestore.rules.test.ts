@@ -82,6 +82,7 @@ function createHouseBatch(db: Firestore, uid: string, houseId = HOUSE_ID, code =
     name: 'Casa',
     ownerId: uid,
     inviteCode: code,
+    currency: 'EUR',
     createdAt: serverTimestamp(),
   });
   batch.set(doc(db, 'invites', code), {
@@ -379,6 +380,97 @@ describe('tasks', () => {
     batch.delete(doc(db, 'houses', HOUSE_ID, 'members', 'ana'));
     batch.update(doc(db, 'users', 'ana'), { houseId: null });
     await assertSucceeds(batch.commit());
+  });
+});
+
+describe('purchases', () => {
+  const purchaseRef = (uid: string) => doc(dbAs(uid), 'houses', HOUSE_ID, 'purchases', 'p1');
+  const newPurchase = (paidBy: string) => ({
+    id: 'p1',
+    items: ['Papel higiênico', 'Produtos de limpeza'],
+    amountCents: 5000,
+    date: new Date(2026, 9, 14),
+    paidBy,
+    splitCount: 4,
+    createdAt: serverTimestamp(),
+  });
+
+  async function seedPurchase(paidBy = 'ana') {
+    await seed((db) =>
+      setDoc(doc(db, 'houses', HOUSE_ID, 'purchases', 'p1'), {
+        ...newPurchase(paidBy),
+        createdAt: new Date(),
+      }),
+    );
+  }
+
+  it('lets members register purchases they paid for', async () => {
+    await seedHouse('admin', ['ana']);
+    await seedUser('outsider');
+    await assertSucceeds(setDoc(purchaseRef('ana'), newPurchase('ana')));
+    await assertFails(setDoc(purchaseRef('outsider'), newPurchase('outsider')));
+  });
+
+  it('rejects purchases paid by someone else or with invalid values', async () => {
+    await seedHouse('admin', ['ana']);
+    await assertFails(setDoc(purchaseRef('ana'), newPurchase('admin')));
+    await assertFails(setDoc(purchaseRef('ana'), { ...newPurchase('ana'), amountCents: 0 }));
+    await assertFails(setDoc(purchaseRef('ana'), { ...newPurchase('ana'), amountCents: 12.5 }));
+    await assertFails(setDoc(purchaseRef('ana'), { ...newPurchase('ana'), items: [] }));
+    await assertFails(
+      setDoc(purchaseRef('ana'), { ...newPurchase('ana'), items: [], description: '  ' }),
+    );
+    await assertFails(setDoc(purchaseRef('ana'), { ...newPurchase('ana'), splitCount: 0 }));
+  });
+
+  it('accepts a description with or without items', async () => {
+    await seedHouse('admin', ['ana']);
+    await assertSucceeds(
+      setDoc(purchaseRef('ana'), {
+        ...newPurchase('ana'),
+        items: [],
+        description: 'Compra do mês no supermercado',
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(purchaseRef('ana'), {
+        items: ['Arroz', 'Feijão'],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('lets the payer and the admin edit or delete, but not other residents', async () => {
+    await seedHouse('admin', ['ana', 'bia']);
+    await seedPurchase('ana');
+    const edit = { amountCents: 6000, updatedAt: serverTimestamp() };
+
+    await assertFails(updateDoc(purchaseRef('bia'), edit));
+    await assertFails(deleteDoc(purchaseRef('bia')));
+    await assertSucceeds(updateDoc(purchaseRef('ana'), edit));
+    await assertSucceeds(updateDoc(purchaseRef('admin'), edit));
+    await assertSucceeds(deleteDoc(purchaseRef('admin')));
+  });
+
+  it('does not let the payer or the split be changed', async () => {
+    await seedHouse('admin', ['ana']);
+    await seedPurchase('ana');
+    await assertFails(
+      updateDoc(purchaseRef('ana'), { paidBy: 'admin', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(purchaseRef('ana'), { splitCount: 1, updatedAt: serverTimestamp() }),
+    );
+  });
+});
+
+describe('house currency', () => {
+  it('lets only the admin set a supported currency', async () => {
+    await seedHouse('admin', ['ana']);
+    const houseRef = (uid: string) => doc(dbAs(uid), 'houses', HOUSE_ID);
+    await assertFails(updateDoc(houseRef('ana'), { currency: 'BRL' }));
+    await assertFails(updateDoc(houseRef('admin'), { currency: 'JPY' }));
+    await assertSucceeds(updateDoc(houseRef('admin'), { currency: 'BRL' }));
   });
 });
 
