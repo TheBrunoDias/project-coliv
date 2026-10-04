@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TextPromptDialog } from '@/components/ui/TextPromptDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useT } from '@/i18n/useT';
 import { renameHouse, updateHouseCurrency } from '@/services/houseService';
 import type { Currency, House } from '@/types';
 import { CURRENCIES, getHouseCurrency } from '@/utils/money';
 
 export function HouseInfoCard({ house }: { house: House }) {
   const isAdmin = useIsAdmin();
+  const t = useT();
   const [renaming, setRenaming] = useState(false);
   const [currencyError, setCurrencyError] = useState(false);
   const currency = getHouseCurrency(house);
@@ -29,13 +31,13 @@ export function HouseInfoCard({ house }: { house: House }) {
     <Card>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-muted">Casa</p>
+          <p className="text-sm text-muted">{t.house.info.label}</p>
           <h1 className="truncate text-xl font-semibold">{house.name}</h1>
         </div>
         {isAdmin && (
           <Button variant="secondary" size="sm" onClick={() => setRenaming(true)}>
             <Pencil className="size-4" />
-            Renomear
+            {t.house.info.rename}
           </Button>
         )}
       </div>
@@ -43,10 +45,10 @@ export function HouseInfoCard({ house }: { house: House }) {
       <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
         {isAdmin ? (
           <label htmlFor="house-currency" className="text-sm text-muted">
-            Moeda das compras
+            {t.house.info.currency}
           </label>
         ) : (
-          <span className="text-sm text-muted">Moeda das compras</span>
+          <span className="text-sm text-muted">{t.house.info.currency}</span>
         )}
         {isAdmin ? (
           <select
@@ -56,25 +58,25 @@ export function HouseInfoCard({ house }: { house: House }) {
             className="h-9 rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand"
           >
             {CURRENCIES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option key={option} value={option}>
+                {t.currencies[option]}
               </option>
             ))}
           </select>
         ) : (
           <span className="text-sm font-medium">
-            {CURRENCIES.find((option) => option.value === currency)?.label}
+            {t.currencies[currency]}
           </span>
         )}
       </div>
-      {currencyError && <Alert>Não foi possível alterar a moeda. Tente novamente.</Alert>}
+      {currencyError && <Alert>{t.house.info.currencyError}</Alert>}
 
       <TextPromptDialog
         open={renaming}
         onClose={() => setRenaming(false)}
-        title="Renomear casa"
-        label="Nome da casa"
-        submitLabel="Salvar"
+        title={t.house.info.renameTitle}
+        label={t.house.info.nameLabel}
+        submitLabel={t.common.save}
         initialValue={house.name}
         onSubmit={(name) => renameHouse(house, name)}
       />

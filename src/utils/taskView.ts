@@ -3,23 +3,13 @@ import { getRotationState, type Rotation } from './rotation';
 
 export type ScheduleUnit = Exclude<Frequency, 'biweekly'>;
 
-const UNIT_NAMES: Record<ScheduleUnit, { every: string; plural: string }> = {
-  daily: { every: 'Todo dia', plural: 'dias' },
-  weekly: { every: 'Toda semana', plural: 'semanas' },
-  monthly: { every: 'Todo mês', plural: 'meses' },
-};
+// Labels live in the i18n messages (`t.tasks.units`, `t.tasks.schedule`)
+export const SCHEDULE_UNITS: ScheduleUnit[] = ['daily', 'weekly', 'monthly'];
 
-export const SCHEDULE_UNITS: { value: ScheduleUnit; label: string }[] = [
-  { value: 'daily', label: 'dias' },
-  { value: 'weekly', label: 'semanas' },
-  { value: 'monthly', label: 'meses' },
-];
-
-/** "Toda semana", "A cada 2 semanas", "A cada 3 dias"... */
-export function formatSchedule(frequency: Frequency, interval: number): string {
-  if (frequency === 'biweekly') return formatSchedule('weekly', interval * 2);
-  const names = UNIT_NAMES[frequency];
-  return interval === 1 ? names.every : `A cada ${interval} ${names.plural}`;
+/** Names used for ids that no longer resolve. */
+export interface AssigneeLabels {
+  formerMember: string;
+  deletedGroup: string;
 }
 
 export interface Assignee {
@@ -39,12 +29,13 @@ export function resolveAssignee(
   members: HouseMember[],
   groups: Group[],
   uid: string,
+  labels: AssigneeLabels,
 ): Assignee {
   if (type === 'group') {
     const groupMembers = members.filter((member) => member.groupIds.includes(id));
     return {
       id,
-      name: groups.find((group) => group.id === id)?.name ?? 'Grupo removido',
+      name: groups.find((group) => group.id === id)?.name ?? labels.deletedGroup,
       isGroup: true,
       memberNames: groupMembers.map((member) => member.displayName),
       includesMe: groupMembers.some((member) => member.userId === uid),
@@ -55,7 +46,7 @@ export function resolveAssignee(
   return {
     id,
     // Users who left or deleted their account
-    name: member?.displayName ?? 'Ex-morador',
+    name: member?.displayName ?? labels.formerMember,
     photoURL: member?.photoURL,
     isGroup: false,
     memberNames: [],
@@ -74,8 +65,8 @@ export interface TaskView {
   changeAt: Date | null;
   isFixed: boolean;
   isMine: boolean;
-  // e.g. "Toda semana"
-  schedule: string;
+  // Normalized schedule (legacy 'biweekly' is weekly × 2), formatted with t.tasks.schedule
+  schedule: { frequency: ScheduleUnit; interval: number };
 }
 
 export function getTaskView(
@@ -85,12 +76,16 @@ export function getTaskView(
   members: HouseMember[],
   groups: Group[],
   uid: string,
+  labels: AssigneeLabels,
 ): TaskView {
   const state = getRotationState(rotation, now);
   const resolve = (index: number) =>
-    resolveAssignee(task.assigneeType, task.rotation[index], members, groups, uid);
+    resolveAssignee(task.assigneeType, task.rotation[index], members, groups, uid, labels);
   const isFixed = task.rotation.length === 1;
-  const schedule = formatSchedule(rotation.frequency, rotation.interval);
+  const schedule =
+    rotation.frequency === 'biweekly'
+      ? { frequency: 'weekly' as const, interval: rotation.interval * 2 }
+      : { frequency: rotation.frequency, interval: rotation.interval };
 
   if (state.status === 'empty') {
     return {

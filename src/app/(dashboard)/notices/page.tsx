@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNow } from '@/hooks/useNow';
+import { useT } from '@/i18n/useT';
 import { deleteNotice } from '@/services/noticeService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
@@ -22,6 +23,7 @@ export default function NoticesPage() {
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
   const isAdmin = useIsAdmin();
   const now = useNow();
+  const t = useT();
 
   const [creating, setCreating] = useState<'rule' | 'announcement' | null>(null);
   const [editing, setEditing] = useState<Notice | null>(null);
@@ -36,22 +38,22 @@ export default function NoticesPage() {
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Mural</h1>
+        <h1 className="text-2xl font-semibold">{t.notices.title}</h1>
         {isAdmin && (
           <Button size="sm" onClick={() => setCreating('announcement')}>
             <Plus className="size-4" />
-            Novo aviso
+            {t.notices.newAnnouncement}
           </Button>
         )}
       </div>
 
       <Card
-        title="Regras da casa"
+        title={t.notices.rulesTitle}
         action={
           isAdmin && (
             <Button size="sm" variant="secondary" onClick={() => setCreating('rule')}>
               <Plus className="size-4" />
-              Regra
+              {t.notices.addRule}
             </Button>
           )
         }
@@ -59,9 +61,7 @@ export default function NoticesPage() {
         {rules.length === 0 ? (
           <div className="flex items-center gap-3 text-sm text-muted">
             <ScrollText className="size-5 shrink-0 text-brand" />
-            {isAdmin
-              ? 'Nenhuma regra ainda. Ex.: "Silêncio após as 22h", "Louça lavada no mesmo dia".'
-              : 'Nenhuma regra definida ainda.'}
+            {isAdmin ? t.notices.noRulesAdmin : t.notices.noRules}
           </div>
         ) : (
           <ol className="flex flex-col gap-3">
@@ -86,13 +86,11 @@ export default function NoticesPage() {
       </Card>
 
       <section className="flex flex-col gap-3">
-        <h2 className="pt-2 font-semibold">Avisos</h2>
+        <h2 className="pt-2 font-semibold">{t.notices.announcements}</h2>
         {announcements.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border p-6 text-center text-muted">
             <Megaphone className="size-8 text-brand" />
-            {isAdmin
-              ? 'Publique recados para todos os moradores, como visitas técnicas ou mudanças na casa.'
-              : 'Nenhum aviso por enquanto.'}
+            {isAdmin ? t.notices.noAnnouncementsAdmin : t.notices.noAnnouncements}
           </div>
         ) : (
           announcements.map((notice) => (
@@ -118,9 +116,9 @@ export default function NoticesPage() {
       <ConfirmDialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        title={deleting?.isRule ? 'Excluir regra?' : 'Excluir aviso?'}
-        description={`"${deleting?.title}" será removido do mural para todos os moradores.`}
-        confirmLabel="Excluir"
+        title={deleting?.isRule ? t.notices.deleteRuleTitle : t.notices.deleteAnnouncementTitle}
+        description={t.notices.deleteDescription(deleting?.title ?? '')}
+        confirmLabel={t.common.delete}
         danger
         onConfirm={async () => {
           if (deleting) await deleteNotice(houseId, deleting.id);

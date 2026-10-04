@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useT } from '@/i18n/useT';
 import { Alert } from './Alert';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
@@ -34,6 +35,7 @@ function TextPromptForm({
   placeholder,
   onSubmit,
 }: TextPromptDialogProps) {
+  const t = useT();
   const [value, setValue] = useState(initialValue);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ function TextPromptForm({
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível salvar. Tente novamente.');
+      setError(t.common.saveError);
       setLoading(false);
     }
   }

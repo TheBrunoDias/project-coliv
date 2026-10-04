@@ -6,8 +6,6 @@ import { auth } from '@/lib/firebase';
 import { ensureUserProfile, subscribeToUserProfile } from '@/services/userService';
 import { useAuthStore } from '@/store/useAuthStore';
 
-const PROFILE_ERROR = 'Não foi possível carregar seu perfil.';
-
 /** Keeps useAuthStore in sync with Firebase Auth and the user's Firestore profile. Mount once. */
 export function useAuthListener() {
   useEffect(() => {
@@ -38,19 +36,19 @@ export function useAuthListener() {
               // While deleting the account the profile changes and disappears on purpose
               if (useAuthStore.getState().deletingAccount) return;
               if (profile) setAuthenticated(firebaseUser, profile);
-              else setError(PROFILE_ERROR);
+              else setError('profileLoad');
             },
             (error) => {
               if (useAuthStore.getState().deletingAccount) return;
               console.error('Profile listener failed', error);
-              setError(PROFILE_ERROR);
+              setError('profileLoad');
             },
           );
         })
         .catch((error: unknown) => {
           if (currentSession !== session) return;
           console.error('Failed to create user profile', error);
-          setError(PROFILE_ERROR);
+          setError('profileLoad');
         });
     });
 

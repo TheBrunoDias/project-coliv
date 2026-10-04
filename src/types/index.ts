@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { Locale } from '@/i18n/config';
 
 export interface User {
   uid: string;
@@ -6,6 +7,7 @@ export interface User {
   email: string;
   photoURL?: string;
   houseId: string | null; // A user belongs to at most one house
+  locale?: Locale; // UI language chosen by the user (follows them across devices)
   createdAt: Timestamp;
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { useT } from '@/i18n/useT';
 import { signInWithGoogle } from '@/services/authService';
 import { getAuthErrorMessage } from '@/utils/authErrors';
 
@@ -17,6 +18,7 @@ function GoogleIcon() {
 }
 
 export function GoogleSignInButton({ onError }: { onError: (message: string) => void }) {
+  const t = useT();
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -25,7 +27,7 @@ export function GoogleSignInButton({ onError }: { onError: (message: string) => 
       // On success GuestOnly redirects once the profile is loaded
       await signInWithGoogle();
     } catch (error) {
-      const message = getAuthErrorMessage(error);
+      const message = getAuthErrorMessage(error, t.auth.errors);
       if (message) onError(message);
       setLoading(false);
     }
@@ -34,7 +36,7 @@ export function GoogleSignInButton({ onError }: { onError: (message: string) => 
   return (
     <Button variant="secondary" loading={loading} onClick={handleClick}>
       {!loading && <GoogleIcon />}
-      Continuar com Google
+      {t.auth.continueWithGoogle}
     </Button>
   );
 }

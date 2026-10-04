@@ -136,7 +136,8 @@ src/
 │   └── navigation/           # Mobile Bottom Nav, Header
 ├── lib/                      # External library configurations
 │   └── firebase.ts           # Firebase Client App & Firestore initialization
-├── hooks/                    # Custom React hooks (useAuth, useHouseListeners)
+├── hooks/                    # Custom React hooks (useAuthListener, useHouseListeners, useTaskViews)
+├── i18n/                     # Locales config, messages (pt-BR, en), useT / useLocale, changeLocale
 ├── services/                 # Firestore API wrappers & real-time listeners
 ├── store/                    # Zustand stores (useAuthStore, useHouseStore)
 ├── types/                    # TypeScript interfaces & Firestore data models
@@ -163,6 +164,7 @@ interface User {
   email: string;
   photoURL?: string;
   houseId: string | null; // A user belongs to at most one house
+  locale?: 'pt-BR' | 'en'; // UI language chosen by the user
   createdAt: Timestamp;
 }
 ```
@@ -293,9 +295,16 @@ interface Notice {
 - `reactCompiler: true` is on. The compiler reads the property paths used inside closures **during render** to memoize them.
 - Never use non-null assertions on nullable state inside callbacks (`() => remove(item!.id)` crashes on render while `item` is `null`). Guard inside instead: `async () => { if (item) await remove(item.id); }`.
 
-### Language
+### Internationalization (i18n)
 
-- UI copy in **Brazilian Portuguese (pt-BR)**; code, identifiers, and comments in English.
+- Supported UI languages: **pt-BR** and **en** (`src/i18n/config.ts`). Code, identifiers and comments stay in English.
+- **No hardcoded UI strings.** All copy lives in `src/i18n/messages/pt-BR.ts` (source of truth, defines the `Messages` type) and `en.ts` (typed as `Messages`, so a missing key fails the build). Use functions for interpolation and plurals, e.g. `count: (n: number) => ...`.
+- In components: `const t = useT(); t.tasks.title` and `const locale = useLocale()` for formatting.
+- Locale-aware formatting only through utils that take a `locale`: `formatRelativeDay`, `formatMonth` (`utils/date.ts`), `formatMoney` (`utils/money.ts`). Never hardcode `'pt-BR'` in `Intl` calls.
+- No locale in the URL (the app is behind login and invite links must work in any language). The language is picked by `LocaleSync`: user profile `locale` → value saved on the device (`localStorage`) → browser language (Portuguese → pt-BR, anything else → en).
+- `changeLocale()` updates the store, the device and `users.locale`. The picker (`LanguageSelect`) is on the auth screens, onboarding and the House page ("Sua conta").
+- Route `metadata` is static, so page titles are just "Coliv" (no translated titles).
+- Utilities that need words (e.g. "you", "former resident") receive them as parameters (`AssigneeLabels`, `MemberNameLabels`); errors in stores are codes (`AuthErrorCode`) translated by the UI.
 
 ### Styling
 
@@ -340,7 +349,7 @@ interface Notice {
 
 Permissions must be enforced in `firestore.rules`, not only in the UI:
 
-- `users/{uid}`: read/write only by the owner (a user can always set their own `houseId` to `null`); delete only when `houseId` is `null`.
+- `users/{uid}`: read/write only by the owner (a user can always set their own `houseId` to `null`; `locale` must be `pt-BR` or `en`); delete only when `houseId` is `null`.
 - `invites/{code}`: `get` by any authenticated user; `list` denied; write only by the house admin.
 - `houses/{houseId}` and subcollections: read only by members.
 - Joining: a user may create their own `members/{uid}` document only if they have no house and the house's invite code is valid.

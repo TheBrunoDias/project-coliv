@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { useLocale, useT } from '@/i18n/useT';
 import { addPurchase, updatePurchase } from '@/services/purchaseService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
@@ -22,24 +23,35 @@ interface PurchaseFormDialogProps {
 }
 
 export function PurchaseFormDialog({ open, onClose, purchase }: PurchaseFormDialogProps) {
+  const t = useT();
   return (
-    <Dialog open={open} onClose={onClose} title={purchase ? 'Editar compra' : 'Registrar compra'}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={purchase ? t.purchases.form.editTitle : t.purchases.form.newTitle}
+    >
       <PurchaseForm purchase={purchase ?? null} onClose={onClose} />
     </Dialog>
   );
 }
 
-const formatInputAmount = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
+// Editing shows the amount with the locale's decimal separator ("12,50" / "12.50")
+const formatInputAmount = (cents: number, decimalSeparator: string) =>
+  (cents / 100).toFixed(2).replace('.', decimalSeparator);
 
 function PurchaseForm({ purchase, onClose }: { purchase: Purchase | null; onClose: () => void }) {
   const house = useHouseStore((state) => state.house);
   const memberCount = useHouseStore((state) => state.members.length);
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
+  const t = useT();
+  const locale = useLocale();
 
   const [description, setDescription] = useState(purchase?.description ?? '');
   const [items, setItems] = useState<string[]>(purchase?.items ?? []);
   const [draft, setDraft] = useState('');
-  const [amount, setAmount] = useState(purchase ? formatInputAmount(purchase.amountCents) : '');
+  const [amount, setAmount] = useState(() =>
+    purchase ? formatInputAmount(purchase.amountCents, locale === 'en' ? '.' : ',') : '',
+  );
   const [date, setDate] = useState(() =>
     toDateInputValue(purchase ? purchase.date.toDate() : new Date()),
   );
@@ -74,7 +86,7 @@ function PurchaseForm({ purchase, onClose }: { purchase: Purchase | null; onClos
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível salvar a compra. Tente novamente.');
+      setError(t.purchases.form.error);
       setLoading(false);
     }
   }
@@ -83,29 +95,27 @@ function PurchaseForm({ purchase, onClose }: { purchase: Purchase | null; onClos
     // Enter in the items field adds an item instead of submitting (handled in ItemsInput)
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <Textarea
-        label="Descrição (opcional)"
-        placeholder="Ex.: Compra do mês no supermercado"
+        label={t.purchases.form.description}
+        placeholder={t.purchases.form.descriptionPlaceholder}
         rows={2}
         maxLength={200}
         value={description}
         onChange={(event) => setDescription(event.target.value)}
       />
       <ItemsInput items={items} onItemsChange={setItems} draft={draft} onDraftChange={setDraft} />
-      <p className="-mt-3 text-sm text-muted">
-        Preencha a descrição, os itens ou os dois. Em compras grandes, a descrição basta.
-      </p>
+      <p className="-mt-3 text-sm text-muted">{t.purchases.form.contentHint}</p>
 
       <div className="grid grid-cols-2 gap-3">
         <Input
-          label="Valor total"
+          label={t.purchases.form.amount}
           inputMode="decimal"
-          placeholder="0,00"
+          placeholder={t.purchases.form.amountPlaceholder}
           required
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
         />
         <Input
-          label="Data"
+          label={t.purchases.form.date}
           type="date"
           required
           value={date}
@@ -113,21 +123,22 @@ function PurchaseForm({ purchase, onClose }: { purchase: Purchase | null; onClos
         />
       </div>
 
-      {amount && amountCents === null && <Alert>Digite um valor válido, como 50 ou 12,50.</Alert>}
+      {amount && amountCents === null && <Alert>{t.purchases.form.invalidAmount}</Alert>}
 
       {amountCents !== null && (
         <p className="rounded-xl bg-brand/10 px-4 py-3 text-sm text-brand-strong">
           <span className="block text-lg font-semibold">
-            {formatMoney(splitAmount(amountCents, splitCount), currency)} por pessoa
+            {t.purchases.form.perPerson(
+              formatMoney(splitAmount(amountCents, splitCount), currency, locale),
+            )}
           </span>
-          {formatMoney(amountCents, currency)} dividido entre {splitCount}{' '}
-          {splitCount === 1 ? 'morador' : 'moradores'}
+          {t.purchases.form.splitAmong(formatMoney(amountCents, currency, locale), splitCount)}
         </p>
       )}
 
       {error && <Alert>{error}</Alert>}
       <Button type="submit" loading={loading} disabled={!canSubmit}>
-        {purchase ? 'Salvar' : 'Registrar compra'}
+        {purchase ? t.common.save : t.purchases.form.submit}
       </Button>
     </form>
   );

@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNow } from '@/hooks/useNow';
+import { useLocale, useT } from '@/i18n/useT';
 import { deletePurchase } from '@/services/purchaseService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
 import type { Purchase } from '@/types';
+import { formatMonth } from '@/utils/date';
 import { formatMoney, getHouseCurrency } from '@/utils/money';
 import { groupByMonth } from '@/utils/purchases';
 
@@ -22,6 +24,8 @@ export default function PurchasesPage() {
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
   const isAdmin = useIsAdmin();
   const now = useNow();
+  const t = useT();
+  const locale = useLocale();
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Purchase | null>(null);
@@ -36,30 +40,29 @@ export default function PurchasesPage() {
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Compras</h1>
+        <h1 className="text-2xl font-semibold">{t.purchases.title}</h1>
         <Button size="sm" onClick={() => setCreating(true)}>
           <Plus className="size-4" />
-          Registrar compra
+          {t.purchases.register}
         </Button>
       </div>
 
       {months.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border p-6 text-center text-muted">
           <Receipt className="size-8 text-brand" />
-          Comprou algo para a casa? Registre a compra e o valor, e o app mostra quanto fica para
-          cada morador.
+          {t.purchases.empty}
         </div>
       ) : (
         months.map((month) => (
           <section key={month.key} className="flex flex-col gap-3">
             <div className="flex items-end justify-between gap-3 pt-2">
-              <h2 className="font-semibold capitalize">{month.label}</h2>
+              <h2 className="font-semibold capitalize">{formatMonth(month.date, locale)}</h2>
               <p className="text-right text-sm text-muted">
-                {formatMoney(month.totalCents, currency)} no total ·{' '}
+                {t.purchases.monthTotal(formatMoney(month.totalCents, currency, locale))} ·{' '}
                 <span className="font-semibold text-foreground">
-                  {formatMoney(month.perPersonCents, currency)}
+                  {formatMoney(month.perPersonCents, currency, locale)}
                 </span>{' '}
-                por pessoa
+                {t.purchases.perPerson}
               </p>
             </div>
             {month.purchases.map((purchase) => (
@@ -87,9 +90,9 @@ export default function PurchasesPage() {
       <ConfirmDialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        title="Excluir compra?"
-        description="A compra deixará de aparecer na divisão para todos os moradores."
-        confirmLabel="Excluir"
+        title={t.purchases.deleteTitle}
+        description={t.purchases.deleteDescription}
+        confirmLabel={t.common.delete}
         danger
         onConfirm={async () => {
           if (deleting) await deletePurchase(house.id, deleting.id);

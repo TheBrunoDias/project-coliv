@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { GuestOnly } from '@/components/auth/GuestOnly';
+import { LanguageSelect } from '@/components/i18n/LanguageSelect';
 import { FullScreenLoader } from '@/components/ui/FullScreenLoader';
 
 export default function AuthLayout({ children }: LayoutProps<'/'>) {
@@ -10,6 +11,7 @@ export default function AuthLayout({ children }: LayoutProps<'/'>) {
         <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-6 py-10">
           <p className="text-center text-3xl font-bold tracking-tight text-brand">Coliv</p>
           {children}
+          <LanguageSelect />
         </main>
       </GuestOnly>
     </Suspense>

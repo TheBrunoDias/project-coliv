@@ -150,6 +150,13 @@ describe('users', () => {
     await assertSucceeds(deleteDoc(doc(dbAs('bia'), 'users', 'bia')));
   });
 
+  it('lets a user pick a supported language', async () => {
+    await seedUser('ana');
+    const ref = doc(dbAs('ana'), 'users', 'ana');
+    await assertSucceeds(updateDoc(ref, { locale: 'en' }));
+    await assertFails(updateDoc(ref, { locale: 'fr' }));
+  });
+
   it('does not let a user point houseId at a house they are not a member of', async () => {
     await seedHouse('admin');
     await seedUser('ana');

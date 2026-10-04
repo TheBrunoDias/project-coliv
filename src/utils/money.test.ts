@@ -30,10 +30,12 @@ describe('parseAmount', () => {
 
 describe('splitAmount + formatMoney', () => {
   it('splits the example from the spec: 50 among 4 people', () => {
-    expect(normalize(formatMoney(splitAmount(5000, 4), 'EUR'))).toBe('€ 12,50');
+    expect(normalize(formatMoney(splitAmount(5000, 4), 'EUR', 'pt-BR'))).toBe('€ 12,50');
+    expect(normalize(formatMoney(splitAmount(5000, 4), 'EUR', 'en'))).toBe('€12.50');
   });
 
   it('rounds shares to cents when displaying', () => {
-    expect(normalize(formatMoney(splitAmount(5000, 3), 'BRL'))).toBe('R$ 16,67');
+    expect(normalize(formatMoney(splitAmount(5000, 3), 'BRL', 'pt-BR'))).toBe('R$ 16,67');
+    expect(normalize(formatMoney(splitAmount(5000, 3), 'BRL', 'en'))).toBe('R$16.67');
   });
 });

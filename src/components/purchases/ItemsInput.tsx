@@ -2,6 +2,7 @@
 
 import { Plus, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
+import { useT } from '@/i18n/useT';
 
 export const MAX_ITEMS = 30;
 
@@ -15,6 +16,8 @@ interface ItemsInputProps {
 
 /** Chips input: type an item and press Enter (or comma) to add it. */
 export function ItemsInput({ items, onItemsChange, draft, onDraftChange }: ItemsInputProps) {
+  const t = useT();
+
   function addDraft() {
     const values = draft
       .split(',')
@@ -37,7 +40,7 @@ export function ItemsInput({ items, onItemsChange, draft, onDraftChange }: Items
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="purchase-items" className="text-sm font-medium">
-        Itens
+        {t.purchases.form.items}
       </label>
       {items.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
@@ -50,7 +53,7 @@ export function ItemsInput({ items, onItemsChange, draft, onDraftChange }: Items
               <button
                 type="button"
                 onClick={() => onItemsChange(items.filter((_, i) => i !== index))}
-                aria-label={`Remover ${item}`}
+                aria-label={t.purchases.form.removeItem(item)}
                 className="rounded-full p-0.5 hover:bg-brand/20"
               >
                 <X className="size-3.5" />
@@ -62,7 +65,7 @@ export function ItemsInput({ items, onItemsChange, draft, onDraftChange }: Items
       <div className="flex gap-2">
         <input
           id="purchase-items"
-          placeholder={items.length ? 'Mais algum item?' : 'Ex.: Papel higiênico'}
+          placeholder={items.length ? t.purchases.form.moreItems : t.purchases.form.itemsPlaceholder}
           maxLength={80}
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -74,7 +77,7 @@ export function ItemsInput({ items, onItemsChange, draft, onDraftChange }: Items
         <button
           type="button"
           onClick={addDraft}
-          aria-label="Adicionar item"
+          aria-label={t.purchases.form.addItem}
           disabled={!draft.trim()}
           className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground hover:bg-surface-muted disabled:opacity-40"
         >

@@ -23,7 +23,6 @@ describe('groupByMonth', () => {
   it('groups by month keeping order and totals', () => {
     const months = groupByMonth(purchases);
     expect(months.map((m) => m.key)).toEqual(['2026-10', '2026-09']);
-    expect(months[0].label).toBe('outubro de 2026');
     expect(months[0].purchases.map((p) => p.id)).toEqual(['oct-2', 'oct-1']);
     expect(months[0].totalCents).toBe(8000);
     // 5000/4 + 3000/3 (each purchase split among the residents at the time)

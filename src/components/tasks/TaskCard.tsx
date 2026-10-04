@@ -1,6 +1,7 @@
 'use client';
 
 import { Pencil, Trash2 } from 'lucide-react';
+import { useLocale, useT } from '@/i18n/useT';
 import { formatRelativeDay } from '@/utils/date';
 import type { Assignee, TaskView } from '@/utils/taskView';
 import { AssigneeAvatar } from './AssigneeAvatar';
@@ -13,16 +14,23 @@ interface TaskCardProps {
   onDelete?: () => void;
 }
 
-function assigneeLabel(assignee: Assignee): string {
-  return assignee.includesMe && !assignee.isGroup ? `${assignee.name} (você)` : assignee.name;
-}
-
 export function TaskCard({ view, now, onEdit, onDelete }: TaskCardProps) {
-  const { task, current, next, changeAt, status, isFixed, isMine, schedule } = view;
+  const t = useT();
+  const locale = useLocale();
+  const { task, current, next, changeAt, status, isFixed, isMine } = view;
+  const schedule = t.tasks.schedule(view.schedule.frequency, view.schedule.interval);
 
-  let caption = 'Responsável agora';
-  if (status === 'upcoming' && changeAt) caption = `Começa ${formatRelativeDay(changeAt, now)}`;
-  else if (isFixed) caption = 'Responsável fixo';
+  const assigneeLabel = (assignee: Assignee) =>
+    assignee.includesMe && !assignee.isGroup
+      ? `${assignee.name} ${t.house.members.youSuffix}`
+      : assignee.name;
+
+  let caption = t.tasks.card.responsibleNow;
+  if (status === 'upcoming' && changeAt) {
+    caption = t.tasks.card.startsOn(formatRelativeDay(changeAt, now, locale));
+  } else if (isFixed) {
+    caption = t.tasks.card.fixed;
+  }
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
@@ -39,7 +47,7 @@ export function TaskCard({ view, now, onEdit, onDelete }: TaskCardProps) {
               <button
                 type="button"
                 onClick={onEdit}
-                aria-label="Editar tarefa"
+                aria-label={t.tasks.editLabel}
                 className="rounded-lg p-2 text-muted hover:bg-surface-muted hover:text-foreground"
               >
                 <Pencil className="size-4" />
@@ -49,7 +57,7 @@ export function TaskCard({ view, now, onEdit, onDelete }: TaskCardProps) {
               <button
                 type="button"
                 onClick={onDelete}
-                aria-label="Excluir tarefa"
+                aria-label={t.tasks.deleteLabel}
                 className="rounded-lg p-2 text-muted hover:bg-surface-muted hover:text-danger"
               >
                 <Trash2 className="size-4" />
@@ -74,21 +82,23 @@ export function TaskCard({ view, now, onEdit, onDelete }: TaskCardProps) {
           </div>
         </div>
       ) : (
-        <p className="rounded-xl bg-surface-muted p-3 text-sm text-muted">Sem responsável</p>
+        <p className="rounded-xl bg-surface-muted p-3 text-sm text-muted">{t.tasks.card.noAssignee}</p>
       )}
 
       <p className="text-sm text-muted">
         {status === 'active' && next && changeAt ? (
           <>
-            Próximo: <span className="font-medium text-foreground">{assigneeLabel(next)}</span>
-            {' · '}troca {formatRelativeDay(changeAt, now)}
+            {t.tasks.card.next}{' '}
+            <span className="font-medium text-foreground">{assigneeLabel(next)}</span>
+            {' · '}
+            {t.tasks.card.changes(formatRelativeDay(changeAt, now, locale))}
             {' · '}
             {schedule}
           </>
         ) : status === 'upcoming' && !isFixed ? (
-          `Rodízio entre ${task.rotation.length} · ${schedule}`
+          t.tasks.card.rotationAmong(task.rotation.length, schedule)
         ) : (
-          'Sem rodízio'
+          t.tasks.card.noRotation
         )}
       </p>
     </article>

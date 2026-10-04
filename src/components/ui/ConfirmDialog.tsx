@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useT } from '@/i18n/useT';
 import { Alert } from './Alert';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
@@ -34,6 +35,7 @@ function ConfirmDialogBody({
   danger = false,
   confirmText,
 }: ConfirmDialogProps) {
+  const t = useT();
   const [typed, setTyped] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ function ConfirmDialogBody({
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível concluir. Tente novamente.');
+      setError(t.common.actionError);
       setLoading(false);
     }
   }
@@ -58,7 +60,7 @@ function ConfirmDialogBody({
       <div className="text-muted">{description}</div>
       {confirmText && (
         <Input
-          label={`Digite "${confirmText}" para confirmar`}
+          label={t.common.typeToConfirm(confirmText)}
           value={typed}
           onChange={(event) => setTyped(event.target.value)}
           autoComplete="off"
@@ -75,7 +77,7 @@ function ConfirmDialogBody({
           {confirmLabel}
         </Button>
         <Button variant="ghost" onClick={onClose} disabled={loading}>
-          Cancelar
+          {t.common.cancel}
         </Button>
       </div>
     </>

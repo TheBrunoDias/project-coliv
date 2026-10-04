@@ -4,15 +4,13 @@ import { splitAmount } from './money';
 export interface MonthSummary {
   // "2026-10"
   key: string;
-  // "outubro de 2026"
-  label: string;
+  // Any day in the month, for formatting its name (formatMonth)
+  date: Date;
   purchases: Purchase[];
   totalCents: number;
   // Sum of each purchase's per-person share
   perPersonCents: number;
 }
-
-const monthFormat = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
 
 const monthKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -26,7 +24,7 @@ export function groupByMonth(purchases: Purchase[]): MonthSummary[] {
     const key = monthKey(date);
     let month = months.get(key);
     if (!month) {
-      month = { key, label: monthFormat.format(date), purchases: [], totalCents: 0, perPersonCents: 0 };
+      month = { key, date, purchases: [], totalCents: 0, perPersonCents: 0 };
       months.set(key, month);
     }
     month.purchases.push(purchase);

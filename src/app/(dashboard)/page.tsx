@@ -8,6 +8,7 @@ import { TaskCard } from '@/components/tasks/TaskCard';
 import { Card } from '@/components/ui/Card';
 import { useNow } from '@/hooks/useNow';
 import { useTaskViews } from '@/hooks/useTaskViews';
+import { useLocale, useT } from '@/i18n/useT';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
 import { formatMoney, getHouseCurrency } from '@/utils/money';
@@ -25,7 +26,9 @@ export default function DashboardPage() {
   const now = useNow();
   const month = getMonthSummary(purchases, now);
   const currency = getHouseCurrency(house);
-  const firstName = profile?.displayName.split(' ')[0];
+  const firstName = profile?.displayName.split(' ')[0] ?? '';
+  const t = useT();
+  const locale = useLocale();
 
   // Notices are sorted newest first; only surface recent announcements
   const latestAnnouncement = notices.find((notice) => !notice.isRule);
@@ -38,14 +41,14 @@ export default function DashboardPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Olá, {firstName}!</h1>
+      <h1 className="text-2xl font-semibold">{t.common.hello(firstName)}</h1>
 
       {showAnnouncement && latestAnnouncement && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Último aviso</h2>
+            <h2 className="font-semibold">{t.dashboard.latestNotice}</h2>
             <Link href="/notices" className="flex items-center text-sm font-medium text-brand">
-              Ver mural
+              {t.dashboard.seeNotices}
               <ChevronRight className="size-4" />
             </Link>
           </div>
@@ -59,16 +62,14 @@ export default function DashboardPage() {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold">Suas responsabilidades agora</h2>
+        <h2 className="font-semibold">{t.dashboard.myDuties}</h2>
         {mine.length > 0 ? (
           mine.map((view) => <TaskCard key={view.task.id} view={view} now={now} />)
         ) : (
           <Card>
             <div className="flex items-center gap-3 text-muted">
               <PartyPopper className="size-5 shrink-0 text-brand" />
-              {views.length > 0
-                ? 'Nenhuma tarefa com você neste momento.'
-                : 'A casa ainda não tem tarefas.'}
+              {views.length > 0 ? t.dashboard.noDutiesNow : t.dashboard.noTasks}
             </div>
           </Card>
         )}
@@ -79,11 +80,14 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <Receipt className="size-5 shrink-0 text-brand" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">Compras do mês</p>
+              <p className="font-semibold">{t.dashboard.monthPurchases}</p>
               <p className="text-sm text-muted">
                 {month
-                  ? `${formatMoney(month.totalCents, currency)} no total · ${formatMoney(month.perPersonCents, currency)} por pessoa`
-                  : 'Nenhuma compra registrada este mês'}
+                  ? t.dashboard.monthSummary(
+                      formatMoney(month.totalCents, currency, locale),
+                      formatMoney(month.perPersonCents, currency, locale),
+                    )
+                  : t.dashboard.noPurchasesThisMonth}
               </p>
             </div>
             <ChevronRight className="size-5 text-muted" />
@@ -93,10 +97,10 @@ export default function DashboardPage() {
 
       {onDuty.length > 0 && (
         <Card
-          title="Quem está de plantão"
+          title={t.dashboard.onDuty}
           action={
             <Link href="/tasks" className="flex items-center text-sm font-medium text-brand">
-              Ver tudo
+              {t.dashboard.seeAll}
               <ChevronRight className="size-4" />
             </Link>
           }
@@ -109,7 +113,9 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{task.title}</p>
                     <p className="truncate text-sm text-muted">
-                      {current.includesMe && !current.isGroup ? 'Você' : current.name}
+                      {current.includesMe && !current.isGroup
+                        ? `${current.name} ${t.house.members.youSuffix}`
+                        : current.name}
                     </p>
                   </div>
                 </li>

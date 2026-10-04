@@ -1,13 +1,10 @@
+import type { Locale } from '@/i18n/config';
 import type { Currency, House } from '@/types';
 
 export const DEFAULT_CURRENCY: Currency = 'EUR';
 
-export const CURRENCIES: { value: Currency; label: string }[] = [
-  { value: 'EUR', label: 'Euro (€)' },
-  { value: 'BRL', label: 'Real (R$)' },
-  { value: 'USD', label: 'Dólar americano (US$)' },
-  { value: 'GBP', label: 'Libra esterlina (£)' },
-];
+// Labels live in the i18n messages (`t.currencies`)
+export const CURRENCIES: Currency[] = ['EUR', 'BRL', 'USD', 'GBP'];
 
 // Money is stored in integer cents to avoid floating point errors
 const MAX_CENTS = 100_000_000;
@@ -16,8 +13,8 @@ export function getHouseCurrency(house: Pick<House, 'currency'> | null | undefin
   return house?.currency ?? DEFAULT_CURRENCY;
 }
 
-export function formatMoney(cents: number, currency: Currency): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(cents / 100);
+export function formatMoney(cents: number, currency: Currency, locale: Locale): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
 }
 
 /**

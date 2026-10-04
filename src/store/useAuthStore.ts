@@ -3,19 +3,21 @@ import { create } from 'zustand';
 import type { User } from '@/types';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
+// Translated by AuthErrorScreen (t.auth.errorScreen)
+export type AuthErrorCode = 'profileLoad' | 'deleteAccount';
 
 interface AuthState {
   status: AuthStatus;
   firebaseUser: FirebaseUser | null;
   // Firestore profile; only set once status is 'authenticated'
   profile: User | null;
-  error: string | null;
+  error: AuthErrorCode | null;
   // Keeps the UI on a loader (no redirects) while the account is being deleted
   deletingAccount: boolean;
   setLoading: () => void;
   setAuthenticated: (firebaseUser: FirebaseUser, profile: User) => void;
   setUnauthenticated: () => void;
-  setError: (error: string) => void;
+  setError: (error: AuthErrorCode) => void;
   setDeletingAccount: (deletingAccount: boolean) => void;
 }
 

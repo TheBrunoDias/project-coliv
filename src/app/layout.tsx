@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthListener } from "@/components/auth/AuthListener";
+import { LocaleSync } from "@/components/i18n/LocaleSync";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
     default: "Coliv",
     template: "%s · Coliv",
   },
-  description: "Tarefas, compras e avisos da casa compartilhada em um só lugar.",
+  description: "Chores, shared purchases and notices for shared homes. / Tarefas, compras e avisos da casa compartilhada.",
 };
 
 export const viewport: Viewport = {
@@ -32,11 +34,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="pt-BR"
+      // Updated on the client by LocaleSync
+      lang={DEFAULT_LOCALE}
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
       <body className="min-h-dvh bg-background font-sans text-foreground">
         <AuthListener />
+        <LocaleSync />
         {children}
       </body>
     </html>

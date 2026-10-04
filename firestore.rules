@@ -49,6 +49,10 @@ service cloud.firestore {
       return isSignedIn() && get(housePath(houseId)).data.ownerId == request.auth.uid;
     }
 
+    function isValidLocale(user) {
+      return !('locale' in user) || user.locale in ['pt-BR', 'en'];
+    }
+
     function isValidCurrency(house) {
       return !('currency' in house) || house.currency in ['EUR', 'BRL', 'USD', 'GBP'];
     }
@@ -63,17 +67,19 @@ service cloud.firestore {
       allow read: if isSelf(uid);
 
       allow create: if isSelf(uid)
-        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'houseId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'houseId', 'locale', 'createdAt'])
         && request.resource.data.uid == uid
         && isValidDisplayName(request.resource.data.displayName)
+        && isValidLocale(request.resource.data)
         && request.resource.data.houseId == null
         && request.resource.data.createdAt == request.time;
 
       // houseId can stay the same, be cleared (leave / lazy cleanup), or be set from null
       // when the same batch creates the user's member document (create house / join).
       allow update: if isSelf(uid)
-        && changedKeys().hasOnly(['displayName', 'photoURL', 'houseId'])
+        && changedKeys().hasOnly(['displayName', 'photoURL', 'houseId', 'locale'])
         && isValidDisplayName(request.resource.data.displayName)
+        && isValidLocale(request.resource.data)
         && (request.resource.data.houseId == resource.data.houseId
             || request.resource.data.houseId == null
             || (resource.data.houseId == null

@@ -5,6 +5,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { useT } from '@/i18n/useT';
 import { setGroupMembers } from '@/services/groupService';
 import type { Group, HouseMember } from '@/types';
 
@@ -16,8 +17,13 @@ interface GroupMembersDialogProps {
 }
 
 export function GroupMembersDialog({ houseId, group, members, onClose }: GroupMembersDialogProps) {
+  const t = useT();
   return (
-    <Dialog open={group !== null} onClose={onClose} title={group ? `Membros de ${group.name}` : ''}>
+    <Dialog
+      open={group !== null}
+      onClose={onClose}
+      title={group ? t.house.groups.membersTitle(group.name) : ''}
+    >
       {group && (
         <GroupMembersForm houseId={houseId} group={group} members={members} onClose={onClose} />
       )}
@@ -36,6 +42,7 @@ function GroupMembersForm({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   function toggle(userId: string) {
     setSelected((current) => {
@@ -54,7 +61,7 @@ function GroupMembersForm({
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível salvar. Tente novamente.');
+      setError(t.common.saveError);
       setLoading(false);
     }
   }
@@ -79,7 +86,7 @@ function GroupMembersForm({
       </ul>
       {error && <Alert>{error}</Alert>}
       <Button loading={loading} onClick={handleSave}>
-        Salvar
+        {t.common.save}
       </Button>
     </>
   );

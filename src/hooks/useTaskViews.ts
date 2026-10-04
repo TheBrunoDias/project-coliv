@@ -1,6 +1,7 @@
 'use client';
 
 import { toRotation } from '@/services/taskService';
+import { useT } from '@/i18n/useT';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
 import { getTaskView, type TaskView } from '@/utils/taskView';
@@ -13,6 +14,8 @@ export function useTaskViews(): TaskView[] {
   const groups = useHouseStore((state) => state.groups);
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
   const now = useNow();
+  const t = useT();
+  const labels = { formerMember: t.common.formerMember, deletedGroup: t.common.deletedGroup };
 
-  return tasks.map((task) => getTaskView(task, toRotation(task), now, members, groups, uid));
+  return tasks.map((task) => getTaskView(task, toRotation(task), now, members, groups, uid, labels));
 }

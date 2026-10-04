@@ -6,12 +6,14 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useT } from '@/i18n/useT';
 import { regenerateInviteCode } from '@/services/houseService';
 import type { House } from '@/types';
 import { getInviteUrl } from '@/utils/inviteCode';
 
 /** Admin only. */
 export function InviteLinkCard({ house }: { house: House }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
@@ -27,7 +29,7 @@ export function InviteLinkCard({ house }: { house: House }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError('Não foi possível copiar. Selecione o link e copie manualmente.');
+      setError(t.house.invite.copyError);
     }
   }
 
@@ -35,8 +37,8 @@ export function InviteLinkCard({ house }: { house: House }) {
     setError(null);
     try {
       await navigator.share({
-        title: `Convite para ${house.name}`,
-        text: `Entre na casa "${house.name}" no Coliv:`,
+        title: t.house.invite.shareTitle(house.name),
+        text: t.house.invite.shareText(house.name),
         url,
       });
     } catch (err) {
@@ -48,8 +50,8 @@ export function InviteLinkCard({ house }: { house: House }) {
 
   return (
     <Card
-      title="Convidar moradores"
-      description="Qualquer pessoa com este link pode entrar na casa."
+      title={t.house.invite.title}
+      description={t.house.invite.description}
     >
       <p className="truncate rounded-xl bg-surface-muted px-3 py-2.5 font-mono text-sm select-all">
         {url}
@@ -61,7 +63,7 @@ export function InviteLinkCard({ house }: { house: House }) {
         {canShare && (
           <Button className="flex-1" size="sm" onClick={handleShare}>
             <Share2 className="size-4" />
-            Compartilhar
+            {t.house.invite.share}
           </Button>
         )}
         <Button
@@ -71,21 +73,21 @@ export function InviteLinkCard({ house }: { house: House }) {
           onClick={handleCopy}
         >
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? 'Copiado!' : 'Copiar link'}
+          {copied ? t.house.invite.copied : t.house.invite.copy}
         </Button>
       </div>
 
       <Button variant="ghost" size="sm" onClick={() => setConfirmingRegenerate(true)}>
         <RefreshCw className="size-4" />
-        Gerar novo link
+        {t.house.invite.regenerate}
       </Button>
 
       <ConfirmDialog
         open={confirmingRegenerate}
         onClose={() => setConfirmingRegenerate(false)}
-        title="Gerar novo link?"
-        description="O link atual deixará de funcionar. Quem já mora na casa não é afetado."
-        confirmLabel="Gerar novo link"
+        title={t.house.invite.regenerateTitle}
+        description={t.house.invite.regenerateDescription}
+        confirmLabel={t.house.invite.regenerate}
         onConfirm={() => regenerateInviteCode(house)}
       />
     </Card>

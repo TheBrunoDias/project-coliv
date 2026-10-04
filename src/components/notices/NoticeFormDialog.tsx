@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { useT } from '@/i18n/useT';
 import { createNotice, updateNotice } from '@/services/noticeService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
@@ -21,8 +22,13 @@ interface NoticeFormDialogProps {
 }
 
 export function NoticeFormDialog({ open, onClose, notice, defaultIsRule = false }: NoticeFormDialogProps) {
+  const t = useT();
   const isRule = notice?.isRule ?? defaultIsRule;
-  const title = notice ? (isRule ? 'Editar regra' : 'Editar aviso') : 'Publicar no mural';
+  const title = notice
+    ? isRule
+      ? t.notices.form.editRule
+      : t.notices.form.editAnnouncement
+    : t.notices.form.newTitle;
 
   return (
     <Dialog open={open} onClose={onClose} title={title}>
@@ -42,6 +48,7 @@ function NoticeForm({
 }) {
   const houseId = useHouseStore((state) => state.house?.id);
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
+  const t = useT();
 
   const [isRule, setIsRule] = useState(notice?.isRule ?? defaultIsRule);
   const [title, setTitle] = useState(notice?.title ?? '');
@@ -64,7 +71,7 @@ function NoticeForm({
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível publicar. Tente novamente.');
+      setError(t.notices.form.error);
       setLoading(false);
     }
   }
@@ -81,27 +88,25 @@ function NoticeForm({
               aria-pressed={isRule === value}
               className={`h-9 rounded-lg text-sm font-medium ${isRule === value ? 'bg-surface shadow-sm' : 'text-muted'}`}
             >
-              {value ? 'Regra da casa' : 'Aviso'}
+              {value ? t.notices.form.rule : t.notices.form.announcement}
             </button>
           ))}
         </div>
         <p className="text-sm text-muted">
-          {isRule
-            ? 'Regras ficam fixas no topo do mural até serem removidas.'
-            : 'Avisos são recados do dia a dia, do mais recente ao mais antigo.'}
+          {isRule ? t.notices.form.ruleHint : t.notices.form.announcementHint}
         </p>
       </div>
 
       <Input
-        label="Título"
-        placeholder={isRule ? 'Ex.: Silêncio após as 22h' : 'Ex.: Manutenção do aquecedor na sexta'}
+        label={t.notices.form.title}
+        placeholder={isRule ? t.notices.form.rulePlaceholder : t.notices.form.announcementPlaceholder}
         required
         maxLength={100}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
       />
       <Textarea
-        label="Detalhes (opcional)"
+        label={t.notices.form.details}
         rows={4}
         maxLength={2000}
         value={content}
@@ -110,7 +115,7 @@ function NoticeForm({
 
       {error && <Alert>{error}</Alert>}
       <Button type="submit" loading={loading} disabled={!title.trim()}>
-        {notice ? 'Salvar' : 'Publicar'}
+        {notice ? t.common.save : t.notices.form.publish}
       </Button>
     </form>
   );

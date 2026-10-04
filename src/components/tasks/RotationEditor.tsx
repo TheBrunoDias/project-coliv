@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
+import { useT } from '@/i18n/useT';
 import type { Assignee } from '@/utils/taskView';
 import { AssigneeAvatar } from './AssigneeAvatar';
 
@@ -14,6 +15,7 @@ interface RotationEditorProps {
 }
 
 export function RotationEditor({ value, onChange, options, resolve }: RotationEditorProps) {
+  const t = useT();
   const available = options.filter((option) => !value.includes(option.id));
 
   function move(index: number, offset: -1 | 1) {
@@ -33,17 +35,17 @@ export function RotationEditor({ value, onChange, options, resolve }: RotationEd
                 <span className="w-5 text-center text-sm font-semibold text-muted">{index + 1}</span>
                 <AssigneeAvatar assignee={assignee} />
                 <span className="min-w-0 flex-1 truncate font-medium">{assignee.name}</span>
-                <IconButton label="Subir" disabled={index === 0} onClick={() => move(index, -1)}>
+                <IconButton label={t.tasks.rotation.moveUp} disabled={index === 0} onClick={() => move(index, -1)}>
                   <ArrowUp className="size-4" />
                 </IconButton>
                 <IconButton
-                  label="Descer"
+                  label={t.tasks.rotation.moveDown}
                   disabled={index === value.length - 1}
                   onClick={() => move(index, 1)}
                 >
                   <ArrowDown className="size-4" />
                 </IconButton>
-                <IconButton label="Remover" onClick={() => onChange(value.filter((v) => v !== id))}>
+                <IconButton label={t.tasks.rotation.remove} onClick={() => onChange(value.filter((v) => v !== id))}>
                   <X className="size-4" />
                 </IconButton>
               </li>

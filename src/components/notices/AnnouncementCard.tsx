@@ -1,4 +1,7 @@
+'use client';
+
 import { Avatar } from '@/components/ui/Avatar';
+import { useLocale, useT } from '@/i18n/useT';
 import type { HouseMember, Notice } from '@/types';
 import { formatRelativeDay } from '@/utils/date';
 import { getMemberName } from '@/utils/members';
@@ -14,8 +17,13 @@ interface AnnouncementCardProps {
 }
 
 export function AnnouncementCard({ notice, members, uid, now, onEdit, onDelete }: AnnouncementCardProps) {
+  const t = useT();
+  const locale = useLocale();
   const author = members.find((member) => member.userId === notice.createdBy);
-  const authorName = getMemberName(members, notice.createdBy, uid);
+  const authorName = getMemberName(members, notice.createdBy, uid, {
+    you: author?.displayName ?? t.common.you,
+    formerMember: t.common.formerMember,
+  });
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
@@ -24,8 +32,8 @@ export function AnnouncementCard({ notice, members, uid, now, onEdit, onDelete }
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold">{notice.title}</h3>
           <p className="text-sm text-muted">
-            {authorName === 'você' ? 'Você' : authorName} · {formatRelativeDay(notice.createdAt.toDate(), now)}
-            {notice.updatedAt && ' · editado'}
+            {authorName} · {formatRelativeDay(notice.createdAt.toDate(), now, locale)}
+            {notice.updatedAt && ` · ${t.notices.edited}`}
           </p>
         </div>
         {onEdit && onDelete && <NoticeActions onEdit={onEdit} onDelete={onDelete} />}

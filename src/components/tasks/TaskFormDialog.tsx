@@ -8,18 +8,14 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { useNow } from '@/hooks/useNow';
+import { useLocale, useT } from '@/i18n/useT';
 import { createTask, toRotation, updateTask, type TaskInput } from '@/services/taskService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
 import type { Task } from '@/types';
 import { formatRelativeDay, parseDateInput, toDateInputValue } from '@/utils/date';
 import { getRotationState, startOfDay, toEditableRotation } from '@/utils/rotation';
-import {
-  formatSchedule,
-  resolveAssignee,
-  SCHEDULE_UNITS,
-  type ScheduleUnit,
-} from '@/utils/taskView';
+import { resolveAssignee, SCHEDULE_UNITS, type ScheduleUnit } from '@/utils/taskView';
 import { RotationEditor } from './RotationEditor';
 
 const SCHEDULE_PRESETS: { frequency: ScheduleUnit; interval: number }[] = [
@@ -41,8 +37,9 @@ interface TaskFormDialogProps {
 }
 
 export function TaskFormDialog({ open, onClose, task }: TaskFormDialogProps) {
+  const t = useT();
   return (
-    <Dialog open={open} onClose={onClose} title={task ? 'Editar tarefa' : 'Nova tarefa'}>
+    <Dialog open={open} onClose={onClose} title={task ? t.tasks.form.editTitle : t.tasks.form.newTitle}>
       <TaskForm task={task ?? null} onClose={onClose} />
     </Dialog>
   );
@@ -54,6 +51,8 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
   const groups = useHouseStore((state) => state.groups);
   const uid = useAuthStore((state) => state.profile?.uid) ?? '';
   const now = useNow();
+  const t = useT();
+  const locale = useLocale();
 
   const [initial] = useState(() => {
     if (!task) {
@@ -82,7 +81,8 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
 
   if (!houseId) return null;
 
-  const resolve = (id: string) => resolveAssignee(assigneeType, id, members, groups, uid);
+  const labels = { formerMember: t.common.formerMember, deletedGroup: t.common.deletedGroup };
+  const resolve = (id: string) => resolveAssignee(assigneeType, id, members, groups, uid, labels);
   const options =
     assigneeType === 'user' ? members.map((m) => resolve(m.userId)) : groups.map((g) => resolve(g.id));
   const parsedStart = parseDateInput(startDate);
@@ -130,7 +130,7 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
       onClose();
     } catch (err) {
       console.error(err);
-      setError('Não foi possível salvar a tarefa. Tente novamente.');
+      setError(t.tasks.form.error);
       setLoading(false);
     }
   }
@@ -138,23 +138,23 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <Input
-        label="Tarefa"
-        placeholder="Ex.: Tirar o lixo"
+        label={t.tasks.form.title}
+        placeholder={t.tasks.form.titlePlaceholder}
         required
         maxLength={80}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
       />
       <Textarea
-        label="Detalhes (opcional)"
-        placeholder="Ex.: Lixo reciclável às terças e sextas"
+        label={t.tasks.form.details}
+        placeholder={t.tasks.form.detailsPlaceholder}
         maxLength={500}
         value={description}
         onChange={(event) => setDescription(event.target.value)}
       />
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-sm font-medium">Responsáveis, na ordem do rodízio</legend>
+        <legend className="mb-1.5 text-sm font-medium">{t.tasks.form.assignees}</legend>
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
           {(['user', 'group'] as const).map((type) => (
             <button
@@ -164,20 +164,18 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
               aria-pressed={assigneeType === type}
               className={`h-9 rounded-lg text-sm font-medium ${assigneeType === type ? 'bg-surface shadow-sm' : 'text-muted'}`}
             >
-              {type === 'user' ? 'Moradores' : 'Grupos'}
+              {type === 'user' ? t.tasks.form.residents : t.tasks.form.groups}
             </button>
           ))}
         </div>
         <p className="text-sm text-muted">
-          {assigneeType === 'user'
-            ? 'A tarefa fica com uma pessoa por vez.'
-            : 'A tarefa fica com um grupo inteiro por vez (ex.: Quarto A, depois Quarto B).'}
+          {assigneeType === 'user' ? t.tasks.form.residentsHint : t.tasks.form.groupsHint}
         </p>
         {assigneeType === 'group' && groups.length === 0 ? (
           <p className="rounded-xl bg-surface-muted p-3 text-sm text-muted">
-            Ainda não há grupos. Crie-os em{' '}
+            {t.tasks.form.noGroups}{' '}
             <Link href="/house" className="font-medium text-brand hover:underline">
-              Casa → Grupos
+              {t.tasks.form.noGroupsLink}
             </Link>
             .
           </p>
@@ -189,7 +187,7 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
       {hasRotation && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="task-schedule" className="text-sm font-medium">
-            A vez passa para o próximo
+            {t.tasks.form.schedule}
           </label>
           <select
             id="task-schedule"
@@ -199,47 +197,47 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
           >
             {SCHEDULE_PRESETS.map((preset) => (
               <option key={presetKey(preset.frequency, preset.interval)} value={presetKey(preset.frequency, preset.interval)}>
-                {formatSchedule(preset.frequency, preset.interval)}
+                {t.tasks.schedule(preset.frequency, preset.interval)}
               </option>
             ))}
-            <option value={CUSTOM}>Personalizado…</option>
+            <option value={CUSTOM}>{t.tasks.form.custom}</option>
           </select>
 
           {isCustomSchedule && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted">A cada</span>
+              <span className="text-sm text-muted">{t.tasks.form.every}</span>
               <input
                 type="number"
                 inputMode="numeric"
                 min={1}
                 max={MAX_INTERVAL}
-                aria-label="Quantidade"
+                aria-label={t.tasks.form.quantity}
                 value={Number.isNaN(interval) ? '' : interval}
                 onChange={(event) => setIntervalCount(event.target.valueAsNumber)}
                 className="h-12 w-20 rounded-xl border border-border bg-surface px-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
               <select
-                aria-label="Unidade"
+                aria-label={t.tasks.form.unit}
                 value={frequency}
                 onChange={(event) => setFrequency(event.target.value as ScheduleUnit)}
                 className={`${selectClassName} flex-1`}
               >
                 {SCHEDULE_UNITS.map((unit) => (
-                  <option key={unit.value} value={unit.value}>
-                    {unit.label}
+                  <option key={unit} value={unit}>
+                    {t.tasks.units[unit]}
                   </option>
                 ))}
               </select>
             </div>
           )}
           {isCustomSchedule && !isValidInterval && (
-            <p className="text-sm text-danger">Use um número entre 1 e {MAX_INTERVAL}.</p>
+            <p className="text-sm text-danger">{t.tasks.form.invalidInterval(MAX_INTERVAL)}</p>
           )}
         </div>
       )}
 
       <Input
-        label={hasRotation ? 'Turno do 1º da lista começa em' : 'A partir de'}
+        label={hasRotation ? t.tasks.form.firstTurnStarts : t.tasks.form.startsFrom}
         type="date"
         required
         value={startDate}
@@ -254,12 +252,13 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
           startDate={parsedStart}
           now={now}
           resolveName={(id) => resolve(id).name}
+          format={(date) => formatRelativeDay(date, now, locale)}
         />
       )}
 
       {error && <Alert>{error}</Alert>}
       <Button type="submit" loading={loading} disabled={!canSubmit}>
-        {task ? 'Salvar' : 'Criar tarefa'}
+        {task ? t.common.save : t.tasks.form.create}
       </Button>
     </form>
   );
@@ -275,6 +274,7 @@ function RotationPreview({
   startDate,
   now,
   resolveName,
+  format,
 }: {
   rotation: string[];
   frequency: ScheduleUnit;
@@ -282,7 +282,9 @@ function RotationPreview({
   startDate: Date;
   now: Date;
   resolveName: (id: string) => string;
+  format: (date: Date) => string;
 }) {
+  const t = useT();
   const state = getRotationState(
     { rotation, frequency, interval, anchorDate: startDate, anchorIndex: 0 },
     now,
@@ -290,11 +292,14 @@ function RotationPreview({
 
   let text = '';
   if (state.status === 'upcoming') {
-    text = `${resolveName(rotation[state.firstIndex])} começa ${formatRelativeDay(state.startsAt, now)}.`;
+    text = t.tasks.form.previewStarts(resolveName(rotation[state.firstIndex]), format(state.startsAt));
   } else if (state.status === 'active') {
-    text = `Agora: ${resolveName(rotation[state.currentIndex])}.`;
+    text = t.tasks.form.previewNow(resolveName(rotation[state.currentIndex]));
     if (state.nextIndex !== null && state.nextChange) {
-      text += ` Depois, ${resolveName(rotation[state.nextIndex])} a partir de ${formatRelativeDay(state.nextChange, now)}.`;
+      text += t.tasks.form.previewNext(
+        resolveName(rotation[state.nextIndex]),
+        format(state.nextChange),
+      );
     }
   }
 

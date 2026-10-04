@@ -3,9 +3,11 @@
 import { LogOut, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { DeleteAccountDialog } from '@/components/auth/DeleteAccountDialog';
+import { LanguageSelect } from '@/components/i18n/LanguageSelect';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { useT } from '@/i18n/useT';
 import { signOutUser } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHouseStore } from '@/store/useHouseStore';
@@ -14,11 +16,12 @@ export function AccountCard() {
   const profile = useAuthStore((state) => state.profile);
   const house = useHouseStore((state) => state.house);
   const [deleting, setDeleting] = useState(false);
+  const t = useT();
 
   if (!profile) return null;
 
   return (
-    <Card title="Sua conta">
+    <Card title={t.house.account.title} action={<LanguageSelect />}>
       <div className="flex items-center gap-3">
         <Avatar name={profile.displayName} photoURL={profile.photoURL} />
         <div className="min-w-0">
@@ -29,7 +32,7 @@ export function AccountCard() {
       <div className="flex flex-col gap-1">
         <Button variant="secondary" size="sm" onClick={() => signOutUser()}>
           <LogOut className="size-4" />
-          Sair da conta
+          {t.common.signOut}
         </Button>
         <Button
           variant="ghost"
@@ -38,7 +41,7 @@ export function AccountCard() {
           onClick={() => setDeleting(true)}
         >
           <Trash2 className="size-4" />
-          Excluir conta
+          {t.common.deleteAccount}
         </Button>
       </div>
 

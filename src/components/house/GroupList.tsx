@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TextPromptDialog } from '@/components/ui/TextPromptDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useT } from '@/i18n/useT';
 import { createGroup, deleteGroup, renameGroup } from '@/services/groupService';
 import { useHouseStore } from '@/store/useHouseStore';
 import type { Group } from '@/types';
@@ -17,6 +18,7 @@ export function GroupList() {
   const members = useHouseStore((state) => state.members);
   const groups = useHouseStore((state) => state.groups);
   const isAdmin = useIsAdmin();
+  const t = useT();
 
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<Group | null>(null);
@@ -30,19 +32,19 @@ export function GroupList() {
 
   return (
     <Card
-      title="Grupos"
-      description="Quartos ou equipes que podem dividir tarefas."
+      title={t.house.groups.title}
+      description={t.house.groups.description}
       action={
         isAdmin && (
           <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
-            Novo
+            {t.house.groups.new}
           </Button>
         )
       }
     >
       {groups.length === 0 ? (
-        <p className="text-sm text-muted">Nenhum grupo ainda. Ex.: &quot;Quarto 1&quot;, &quot;Cozinha&quot;.</p>
+        <p className="text-sm text-muted">{t.house.groups.empty}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {groups.map((group) => {
@@ -53,13 +55,13 @@ export function GroupList() {
                   <p className="truncate font-medium">{group.name}</p>
                   {isAdmin && (
                     <div className="-my-1 flex shrink-0 items-center">
-                      <IconButton label="Editar membros" onClick={() => setEditingMembers(group)}>
+                      <IconButton label={t.house.groups.editMembers} onClick={() => setEditingMembers(group)}>
                         <UserPlus className="size-4" />
                       </IconButton>
-                      <IconButton label="Renomear grupo" onClick={() => setRenaming(group)}>
+                      <IconButton label={t.house.groups.rename} onClick={() => setRenaming(group)}>
                         <Pencil className="size-4" />
                       </IconButton>
-                      <IconButton label="Excluir grupo" onClick={() => setDeleting(group)} danger>
+                      <IconButton label={t.house.groups.delete} onClick={() => setDeleting(group)} danger>
                         <Trash2 className="size-4" />
                       </IconButton>
                     </div>
@@ -68,7 +70,7 @@ export function GroupList() {
                 <p className="mt-1 text-sm text-muted">
                   {groupMembers.length > 0
                     ? groupMembers.map((m) => m.displayName).join(', ')
-                    : 'Sem membros'}
+                    : t.house.groups.noMembers}
                 </p>
               </li>
             );
@@ -79,18 +81,18 @@ export function GroupList() {
       <TextPromptDialog
         open={creating}
         onClose={() => setCreating(false)}
-        title="Novo grupo"
-        label="Nome do grupo"
-        placeholder="Ex.: Quarto 1"
-        submitLabel="Criar grupo"
+        title={t.house.groups.newTitle}
+        label={t.house.groups.nameLabel}
+        placeholder={t.house.groups.namePlaceholder}
+        submitLabel={t.house.groups.create}
         onSubmit={(name) => createGroup(houseId, name)}
       />
       <TextPromptDialog
         open={renaming !== null}
         onClose={() => setRenaming(null)}
-        title="Renomear grupo"
-        label="Nome do grupo"
-        submitLabel="Salvar"
+        title={t.house.groups.rename}
+        label={t.house.groups.nameLabel}
+        submitLabel={t.common.save}
         initialValue={renaming?.name}
         // No `renaming!.id` here: React Compiler reads closure deps during render
         onSubmit={async (name) => {
@@ -106,9 +108,9 @@ export function GroupList() {
       <ConfirmDialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        title="Excluir grupo?"
-        description={`O grupo "${deleting?.name}" será excluído. Os moradores continuam na casa.`}
-        confirmLabel="Excluir"
+        title={t.house.groups.deleteTitle}
+        description={t.house.groups.deleteDescription(deleting?.name ?? '')}
+        confirmLabel={t.common.delete}
         danger
         onConfirm={async () => {
           if (deleting) await deleteGroup(houseId, deleting.id, members);

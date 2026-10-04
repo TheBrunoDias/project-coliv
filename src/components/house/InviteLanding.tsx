@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { FullScreenLoader } from '@/components/ui/FullScreenLoader';
+import { useT } from '@/i18n/useT';
 import { signOutUser } from '@/services/authService';
 import { getInvite, joinHouse } from '@/services/houseService';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -18,6 +19,7 @@ type InviteState = { status: 'loading' } | { status: 'ready'; invite: Invite | n
 export function InviteLanding({ code }: { code: string }) {
   const profile = useAuthStore((state) => state.profile);
   const router = useRouter();
+  const t = useT();
   const [state, setState] = useState<InviteState>({ status: 'loading' });
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function InviteLanding({ code }: { code: string }) {
       router.replace('/');
     } catch (err) {
       console.error(err);
-      setError('Não foi possível entrar na casa. O convite pode ter sido renovado; peça um novo link.');
+      setError(t.invite.joinError);
       setJoining(false);
     }
   }
@@ -58,11 +60,11 @@ export function InviteLanding({ code }: { code: string }) {
   if (!invite) {
     return (
       <InviteLayout
-        title="Convite inválido"
-        description="Este link não existe mais ou foi substituído. Peça um novo link para o admin da casa."
+        title={t.invite.invalidTitle}
+        description={t.invite.invalidDescription}
       >
         <Link href="/" className="text-center font-medium text-brand hover:underline">
-          Voltar ao início
+          {t.invite.backHome}
         </Link>
       </InviteLayout>
     );
@@ -70,8 +72,8 @@ export function InviteLanding({ code }: { code: string }) {
 
   if (profile.houseId === invite.houseId) {
     return (
-      <InviteLayout title={invite.houseName} description="Você já faz parte desta casa.">
-        <Button onClick={() => router.replace('/')}>Ir para a casa</Button>
+      <InviteLayout title={invite.houseName} description={t.invite.alreadyMember}>
+        <Button onClick={() => router.replace('/')}>{t.invite.goToHouse}</Button>
       </InviteLayout>
     );
   }
@@ -79,25 +81,22 @@ export function InviteLanding({ code }: { code: string }) {
   if (profile.houseId) {
     return (
       <InviteLayout
-        title={`Convite para ${invite.houseName}`}
-        description="Você já mora em outra casa. Para aceitar este convite, saia da sua casa atual primeiro."
+        title={t.invite.otherHouseTitle(invite.houseName)}
+        description={t.invite.otherHouseDescription}
       >
-        <Button onClick={() => router.push('/house')}>Ir para minha casa</Button>
+        <Button onClick={() => router.push('/house')}>{t.invite.goToMyHouse}</Button>
       </InviteLayout>
     );
   }
 
   return (
-    <InviteLayout
-      title={invite.houseName}
-      description="Você foi convidado para morar nesta casa no Coliv."
-    >
+    <InviteLayout title={invite.houseName} description={t.invite.invited}>
       {error && <Alert>{error}</Alert>}
       <Button loading={joining} onClick={handleJoin}>
-        Entrar na casa
+        {t.invite.join}
       </Button>
       <Button variant="ghost" disabled={joining} onClick={() => signOutUser()}>
-        Não é você, {profile.displayName.split(' ')[0]}? Usar outra conta
+        {t.invite.switchAccount(profile.displayName.split(' ')[0])}
       </Button>
     </InviteLayout>
   );

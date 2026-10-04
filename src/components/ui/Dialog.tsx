@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useT } from '@/i18n/useT';
 
 interface DialogProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface DialogProps {
 /** Native <dialog>: bottom sheet on mobile, centered card on larger screens. */
 export function Dialog({ open, onClose, title, children }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const t = useT();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -39,7 +41,7 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
             <button
               type="button"
               onClick={onClose}
-              aria-label="Fechar"
+              aria-label={t.common.close}
               className="-mr-2 rounded-lg p-2 text-muted hover:bg-surface-muted"
             >
               <X className="size-5" />

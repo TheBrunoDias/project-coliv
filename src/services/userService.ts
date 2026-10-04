@@ -9,6 +9,7 @@ import {
   type FirestoreError,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import type { Locale } from '@/i18n/config';
 import type { User } from '@/types';
 
 const userRef = (uid: string) => doc(db, 'users', uid);
@@ -24,7 +25,7 @@ export async function ensureUserProfile(firebaseUser: FirebaseUser): Promise<voi
     transaction.set(ref, {
       uid: firebaseUser.uid,
       displayName:
-        firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Morador',
+        firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Coliv',
       email: firebaseUser.email ?? '',
       // Firestore rejects undefined values, so omit the field instead
       ...(firebaseUser.photoURL ? { photoURL: firebaseUser.photoURL } : {}),
@@ -48,6 +49,10 @@ export function subscribeToUserProfile(
 
 export function updateUserDisplayName(uid: string, displayName: string): Promise<void> {
   return updateDoc(userRef(uid), { displayName });
+}
+
+export function updateUserLocale(uid: string, locale: Locale): Promise<void> {
+  return updateDoc(userRef(uid), { locale });
 }
 
 /** Security rules only allow this once the user has no house. */

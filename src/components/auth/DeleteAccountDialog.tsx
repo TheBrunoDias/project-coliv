@@ -5,13 +5,12 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
+import { useT } from '@/i18n/useT';
 import { deleteAccount } from '@/services/accountService';
 import { getSignInMethod, reauthenticate } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { House } from '@/types';
 import { getAuthErrorMessage } from '@/utils/authErrors';
-
-const CONFIRM_WORD = 'EXCLUIR';
 
 interface DeleteAccountDialogProps {
   open: boolean;
@@ -21,8 +20,9 @@ interface DeleteAccountDialogProps {
 }
 
 export function DeleteAccountDialog({ open, onClose, house }: DeleteAccountDialogProps) {
+  const t = useT();
   return (
-    <Dialog open={open} onClose={onClose} title="Excluir conta?">
+    <Dialog open={open} onClose={onClose} title={t.deleteAccount.title}>
       <DeleteAccountForm house={house} />
     </Dialog>
   );
@@ -30,6 +30,7 @@ export function DeleteAccountDialog({ open, onClose, house }: DeleteAccountDialo
 
 function DeleteAccountForm({ house }: { house: House | null }) {
   const firebaseUser = useAuthStore((state) => state.firebaseUser);
+  const t = useT();
   const [typed, setTyped] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,7 +40,8 @@ function DeleteAccountForm({ house }: { house: House | null }) {
 
   const method = getSignInMethod(firebaseUser);
   const isAdmin = house?.ownerId === firebaseUser.uid;
-  const canSubmit = typed.trim().toUpperCase() === CONFIRM_WORD && (method === 'google' || password);
+  const confirmWord = t.deleteAccount.confirmWord;
+  const canSubmit = typed.trim().toUpperCase() === confirmWord && (method === 'google' || password);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +53,7 @@ function DeleteAccountForm({ house }: { house: House | null }) {
     try {
       await reauthenticate(firebaseUser, password);
     } catch (err) {
-      const message = getAuthErrorMessage(err);
+      const message = getAuthErrorMessage(err, t.auth.errors);
       if (message) setError(message);
       setLoading(false);
       return;
@@ -65,25 +67,22 @@ function DeleteAccountForm({ house }: { house: House | null }) {
       // onAuthStateChanged(null) now signs the user out and sends them to /login
     } catch (err) {
       console.error('Failed to delete account', err);
-      setAuthError('Não foi possível excluir sua conta por completo. Tente novamente.');
+      setAuthError('deleteAccount');
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 text-muted">
-        <p>Esta ação não pode ser desfeita. Seu perfil e seu login serão apagados.</p>
+        <p>{t.deleteAccount.warning}</p>
         {house && isAdmin && (
-          <p className="font-medium text-danger">
-            Como você é admin, a casa &quot;{house.name}&quot; também será excluída, com todos os
-            moradores, tarefas, compras e avisos.
-          </p>
+          <p className="font-medium text-danger">{t.deleteAccount.adminWarning(house.name)}</p>
         )}
-        {house && !isAdmin && <p>Você sairá da casa &quot;{house.name}&quot;.</p>}
+        {house && !isAdmin && <p>{t.deleteAccount.residentWarning(house.name)}</p>}
       </div>
 
       <Input
-        label={`Digite "${CONFIRM_WORD}" para confirmar`}
+        label={t.common.typeToConfirm(confirmWord)}
         value={typed}
         onChange={(event) => setTyped(event.target.value)}
         autoComplete="off"
@@ -91,22 +90,20 @@ function DeleteAccountForm({ house }: { house: House | null }) {
 
       {method === 'password' ? (
         <Input
-          label="Sua senha"
+          label={t.deleteAccount.passwordLabel}
           type="password"
           autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
       ) : (
-        <p className="text-sm text-muted">
-          Por segurança, vamos pedir para você entrar com o Google mais uma vez.
-        </p>
+        <p className="text-sm text-muted">{t.deleteAccount.googleReauth}</p>
       )}
 
       {error && <Alert>{error}</Alert>}
 
       <Button type="submit" variant="danger" loading={loading} disabled={!canSubmit}>
-        Excluir minha conta
+        {t.deleteAccount.submit}
       </Button>
     </form>
   );

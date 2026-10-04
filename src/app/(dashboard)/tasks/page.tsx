@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNow } from '@/hooks/useNow';
 import { useTaskViews } from '@/hooks/useTaskViews';
+import { useT } from '@/i18n/useT';
 import { deleteTask } from '@/services/taskService';
 import { useHouseStore } from '@/store/useHouseStore';
 import type { Task } from '@/types';
@@ -18,6 +19,7 @@ export default function TasksPage() {
   const views = useTaskViews();
   const now = useNow();
   const isAdmin = useIsAdmin();
+  const t = useT();
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -28,20 +30,18 @@ export default function TasksPage() {
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Tarefas</h1>
+        <h1 className="text-2xl font-semibold">{t.tasks.title}</h1>
         {isAdmin && (
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
-            Nova tarefa
+            {t.tasks.new}
           </Button>
         )}
       </div>
 
       {views.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-6 text-center text-muted">
-          {isAdmin
-            ? 'Nenhuma tarefa ainda. Crie a primeira, como "Tirar o lixo", e defina o rodízio.'
-            : 'Nenhuma tarefa ainda. O admin da casa pode criar os rodízios.'}
+          {isAdmin ? t.tasks.emptyAdmin : t.tasks.emptyResident}
         </p>
       ) : (
         views.map((view) => (
@@ -60,9 +60,9 @@ export default function TasksPage() {
       <ConfirmDialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        title="Excluir tarefa?"
-        description={`"${deleting?.title}" deixará de aparecer para todos os moradores.`}
-        confirmLabel="Excluir"
+        title={t.tasks.deleteTitle}
+        description={t.tasks.deleteDescription(deleting?.title ?? '')}
+        confirmLabel={t.common.delete}
         danger
         onConfirm={async () => {
           if (deleting) await deleteTask(houseId, deleting.id);
