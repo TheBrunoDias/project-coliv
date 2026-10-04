@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidDisplayName(name) {
+      return name is string && name.size() > 0 && name.size() <= 60;
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'houseId', 'createdAt'])
+        && request.resource.data.uid == uid
+        && isValidDisplayName(request.resource.data.displayName)
+        && request.resource.data.houseId == null
+        && request.resource.data.createdAt == request.time;
+
+      // Phase 1: houseId can only stay the same or be cleared.
+      // Phase 2 will allow setting it when joining/creating a house.
+      allow update: if isSelf(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'houseId'])
+        && isValidDisplayName(request.resource.data.displayName)
+        && (request.resource.data.houseId == resource.data.houseId
+            || request.resource.data.houseId == null);
+
+      allow delete: if false;
+    }
+
+    // Everything else is denied until the matching phase adds its rules.
+  }
+}
